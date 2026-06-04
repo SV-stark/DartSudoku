@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/sudoku_logic.dart';
 import '../../providers/sudoku_provider.dart';
 import '../../core/sudoku_analyzer.dart';
-import '../theme.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
 
@@ -173,49 +171,51 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final gameColor = _getDifficultyColor(_provider.difficulty);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Core Layout
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  // Header Row
-                  _buildHeader(gameColor),
-                  const SizedBox(height: 16),
-                  // Stats Row
-                  _buildStatsRow(gameColor),
-                  const SizedBox(height: 16),
-                  // Sudoku Board
-                  Expanded(
-                    child: Center(
-                      child: _provider.status == GameStatus.loading
-                          ? _buildLoadingState()
-                          : SudokuGrid(
-                              board: _provider.currentBoard,
-                              selectedRow: _provider.selectedRow,
-                              selectedCol: _provider.selectedCol,
-                              isClue: _provider.isOriginalClue,
-                              notes: _provider.notes,
-                              solvedBoard: _provider.solvedBoard,
-                              onCellTap: (r, c) {
-                                _provider.selectCell(r, c);
-                              },
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Controls (Numpad + Tool Buttons)
-                  if (_provider.status != GameStatus.loading)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: SudokuNumpad(
+    Widget content;
+    if (isLandscape) {
+      content = Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Left side: Sudoku Grid
+          Expanded(
+            flex: 6,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: _provider.status == GameStatus.loading
+                    ? _buildLoadingState()
+                    : SudokuGrid(
+                        board: _provider.currentBoard,
+                        selectedRow: _provider.selectedRow,
+                        selectedCol: _provider.selectedCol,
+                        isClue: _provider.isOriginalClue,
+                        notes: _provider.notes,
+                        solvedBoard: _provider.solvedBoard,
+                        onCellTap: (r, c) {
+                          _provider.selectCell(r, c);
+                        },
+                      ),
+              ),
+            ),
+          ),
+          // Right side: Controls & Stats
+          Expanded(
+            flex: 5,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildHeader(gameColor),
+                    const SizedBox(height: 12),
+                    _buildStatsRow(gameColor),
+                    const SizedBox(height: 16),
+                    if (_provider.status != GameStatus.loading)
+                      SudokuNumpad(
                         onNumberTap: _provider.enterNumber,
                         onEraseTap: _provider.eraseCell,
                         onUndoTap: _provider.undo,
@@ -224,9 +224,73 @@ class _GameScreenState extends State<GameScreen> {
                         notesModeActive: _provider.notesMode,
                         canUndo: _provider.canUndo,
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      content = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              // Header Row
+              _buildHeader(gameColor),
+              const SizedBox(height: 16),
+              // Stats Row
+              _buildStatsRow(gameColor),
+              const SizedBox(height: 16),
+              // Sudoku Board
+              Expanded(
+                child: Center(
+                  child: _provider.status == GameStatus.loading
+                      ? _buildLoadingState()
+                      : SudokuGrid(
+                          board: _provider.currentBoard,
+                          selectedRow: _provider.selectedRow,
+                          selectedCol: _provider.selectedCol,
+                          isClue: _provider.isOriginalClue,
+                          notes: _provider.notes,
+                          solvedBoard: _provider.solvedBoard,
+                          onCellTap: (r, c) {
+                            _provider.selectCell(r, c);
+                          },
+                        ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Controls (Numpad + Tool Buttons)
+              if (_provider.status != GameStatus.loading)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: SudokuNumpad(
+                    onNumberTap: _provider.enterNumber,
+                    onEraseTap: _provider.eraseCell,
+                    onUndoTap: _provider.undo,
+                    onNotesTap: _provider.toggleNotesMode,
+                    onHintTap: _showHintExplanationDialog,
+                    notesModeActive: _provider.notesMode,
+                    canUndo: _provider.canUndo,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Core Layout
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: content,
             ),
 
             // Game Pause Overlay
@@ -407,33 +471,35 @@ class _GameScreenState extends State<GameScreen> {
                 vertical: 40.0,
                 horizontal: 24.0,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.pause_circle_outline_rounded,
-                    size: 64,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Game Paused',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.pause_circle_outline_rounded,
+                      size: 64,
+                      color: theme.colorScheme.primary,
                     ),
-                  ),
-                  const SizedBox(height: 28),
-                  FilledButton(
-                    onPressed: _provider.resumeGame,
-                    child: const Text(
-                      'RESUME PLAY',
-                      style: TextStyle(
-                        fontSize: 15,
+                    const SizedBox(height: 20),
+                    Text(
+                      'Game Paused',
+                      style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 28),
+                    FilledButton(
+                      onPressed: _provider.resumeGame,
+                      child: const Text(
+                        'RESUME PLAY',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -459,54 +525,56 @@ class _GameScreenState extends State<GameScreen> {
                   vertical: 40.0,
                   horizontal: 24.0,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.gpp_bad_rounded,
-                      size: 64,
-                      color: theme.colorScheme.error,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'GAME OVER',
-                      style: theme.textTheme.headlineMedium?.copyWith(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.gpp_bad_rounded,
+                        size: 64,
                         color: theme.colorScheme.error,
-                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'You committed 3 mistakes and terminated the board.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('EXIT MENU'),
-                          ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'GAME OVER',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () =>
-                                _provider.newGame(widget.difficulty),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: theme.colorScheme.error,
-                              foregroundColor: theme.colorScheme.onError,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'You committed 3 mistakes and terminated the board.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('EXIT MENU'),
                             ),
-                            child: const Text('TRY AGAIN'),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () =>
+                                  _provider.newGame(widget.difficulty),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: theme.colorScheme.error,
+                                foregroundColor: theme.colorScheme.onError,
+                              ),
+                              child: const Text('TRY AGAIN'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -533,50 +601,52 @@ class _GameScreenState extends State<GameScreen> {
                   vertical: 40.0,
                   horizontal: 24.0,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.emoji_events_outlined,
-                      size: 64,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'VICTORY',
-                      style: theme.textTheme.headlineMedium?.copyWith(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.emoji_events_outlined,
+                        size: 64,
                         color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'You successfully solved the matrix in ${_provider.formattedTime}!',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 20),
+                      Text(
+                        'VICTORY',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('EXIT'),
-                          ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'You successfully solved the matrix in ${_provider.formattedTime}!',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () =>
-                                _provider.newGame(widget.difficulty),
-                            child: const Text('PLAY AGAIN'),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('EXIT'),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () =>
+                                  _provider.newGame(widget.difficulty),
+                              child: const Text('PLAY AGAIN'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

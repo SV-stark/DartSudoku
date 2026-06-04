@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/stats_manager.dart';
-import '../../ui/theme.dart';
 
 /// Screen displaying game analytics, win ratios, streaks, and speed scores.
 class StatsScreen extends StatefulWidget {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../providers/sudoku_provider.dart';
-import '../../ui/theme.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
 
@@ -149,7 +148,105 @@ class _SolverScreenState extends State<SolverScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    Widget content;
+    if (isLandscape) {
+      content = Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Left side: Sudoku Grid
+          Expanded(
+            flex: 6,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: SudokuGrid(
+                  board: _provider.solverBoard,
+                  selectedRow: _provider.selectedRow,
+                  selectedCol: _provider.selectedCol,
+                  onCellTap: (r, c) {
+                    _provider.selectCell(r, c);
+                  },
+                ),
+              ),
+            ),
+          ),
+          // Right side: Controls
+          Expanded(
+            flex: 5,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildHeader(),
+                    if (_provider.errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      _buildErrorDisplay(),
+                    ],
+                    const SizedBox(height: 16),
+                    _buildSolverActionButtons(),
+                    const SizedBox(height: 16),
+                    SudokuNumpad(
+                      onNumberTap: _provider.enterNumber,
+                      onEraseTap: _provider.clearCell,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      content = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              // Header Row
+              _buildHeader(),
+              const SizedBox(height: 16),
+              // Grid Screen
+              Expanded(
+                child: Center(
+                  child: SudokuGrid(
+                    board: _provider.solverBoard,
+                    selectedRow: _provider.selectedRow,
+                    selectedCol: _provider.selectedCol,
+                    onCellTap: (r, c) {
+                      _provider.selectCell(r, c);
+                    },
+                  ),
+                ),
+              ),
+
+              // Dynamic Error message block (Material 3 Card)
+              if (_provider.errorMessage != null) ...[
+                const SizedBox(height: 12),
+                _buildErrorDisplay(),
+              ],
+
+              const SizedBox(height: 20),
+              // Solve & Clear Button controls
+              _buildSolverActionButtons(),
+              const SizedBox(height: 20),
+              // Numeric inputs
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: SudokuNumpad(
+                  onNumberTap: _provider.enterNumber,
+                  onEraseTap: _provider.clearCell,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -157,46 +254,7 @@ class _SolverScreenState extends State<SolverScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  // Header Row
-                  _buildHeader(),
-                  const SizedBox(height: 16),
-                  // Grid Screen
-                  Expanded(
-                    child: Center(
-                      child: SudokuGrid(
-                        board: _provider.solverBoard,
-                        selectedRow: _provider.selectedRow,
-                        selectedCol: _provider.selectedCol,
-                        onCellTap: (r, c) {
-                          _provider.selectCell(r, c);
-                        },
-                      ),
-                    ),
-                  ),
-
-                  // Dynamic Error message block (Material 3 Card)
-                  if (_provider.errorMessage != null) ...[
-                    const SizedBox(height: 12),
-                    _buildErrorDisplay(),
-                  ],
-
-                  const SizedBox(height: 20),
-                  // Solve & Clear Button controls
-                  _buildSolverActionButtons(),
-                  const SizedBox(height: 20),
-                  // Numeric inputs
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: SudokuNumpad(
-                      onNumberTap: _provider.enterNumber,
-                      onEraseTap: _provider.clearCell,
-                    ),
-                  ),
-                ],
-              ),
+              child: content,
             ),
 
             // Processing/Solving Overlay loader (Clean Material 3 Card style)
@@ -212,16 +270,18 @@ class _SolverScreenState extends State<SolverScreen> {
                           horizontal: 40,
                           vertical: 32,
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 20),
-                            Text(
-                              'Solving Sudoku...',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 20),
+                              Text(
+                                'Solving Sudoku...',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -300,7 +360,6 @@ class _SolverScreenState extends State<SolverScreen> {
   }
 
   Widget _buildSolverActionButtons() {
-    final theme = Theme.of(context);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
