@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'game_screen.dart';
 import 'solver_screen.dart';
+import 'stats_screen.dart';
 
 /// The entry screen of the application offering play options and the solver utility.
 class HomeScreen extends StatefulWidget {
@@ -44,6 +45,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: SafeArea(
           child: Stack(
             children: [
+              // Floating stats button
+              Positioned(
+                top: 16,
+                right: 16,
+                child: GestureDetector(
+                  onTap: _openStats,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: AppTheme.glassBoxDecoration(
+                      borderRadius: 30,
+                      borderColor: AppTheme.neonCyan.withOpacity(0.3),
+                    ),
+                    child: const Icon(
+                      Icons.insights_rounded,
+                      color: AppTheme.neonCyan,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
               // Ambient glowing blobs in the background
               _buildBackgroundBlob(
                 color: AppTheme.neonViolet.withOpacity(0.12),
@@ -316,6 +337,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       context,
       MaterialPageRoute(
         builder: (context) => const SolverScreen(),
+      ),
+    );
+  }
+
+  void _openStats() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const StatsScreen(),
       ),
     );
   }

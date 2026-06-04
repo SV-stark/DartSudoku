@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/sudoku_logic.dart';
+import '../core/stats_manager.dart';
 
 /// Represents a snapshot of the board state for undo functionality.
 class BoardState {
@@ -94,6 +95,7 @@ class SudokuGameProvider extends ChangeNotifier {
 
     _status = GameStatus.playing;
     _startTimer();
+    StatsManager.recordGameStart(difficulty);
     notifyListeners();
   }
 
@@ -152,6 +154,7 @@ class SudokuGameProvider extends ChangeNotifier {
         if (_mistakes >= maxMistakes) {
           _status = GameStatus.gameOver;
           _stopTimer();
+          StatsManager.recordGameLoss();
         }
       } else {
         // Auto-clean notes for surrounding cells in same row, column, and box
@@ -160,6 +163,7 @@ class SudokuGameProvider extends ChangeNotifier {
         if (_checkWin()) {
           _status = GameStatus.won;
           _stopTimer();
+          StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
         }
       }
     }
@@ -196,6 +200,7 @@ class SudokuGameProvider extends ChangeNotifier {
     if (_checkWin()) {
       _status = GameStatus.won;
       _stopTimer();
+      StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
     }
     notifyListeners();
   }

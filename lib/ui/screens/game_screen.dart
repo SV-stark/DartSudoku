@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/sudoku_logic.dart';
 import '../../providers/sudoku_provider.dart';
+import '../../core/sudoku_analyzer.dart';
 import '../theme.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
@@ -40,6 +41,108 @@ class _GameScreenState extends State<GameScreen> {
     _provider.removeListener(_onStateChange);
     _provider.dispose();
     super.dispose();
+  }
+
+  void _showHintExplanationDialog() {
+    final int r = _provider.selectedRow;
+    final int c = _provider.selectedCol;
+
+    if (r == -1 || c == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.neonCyan.withOpacity(0.9),
+          content: const Text(
+            'Select an empty cell to receive a hint explanation!',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (_provider.isOriginalClue[r][c]) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.neonCyan.withOpacity(0.9),
+          content: const Text(
+            'Starting clues cannot have hints.',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final int correctVal = _provider.solvedBoard[r][c];
+    if (_provider.currentBoard[r][c] == correctVal) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.neonGreen.withOpacity(0.9),
+          content: const Text(
+            'This cell is already correctly solved!',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final String explanation = SudokuAnalyzer.analyzeCell(
+      _provider.currentBoard,
+      r,
+      c,
+      correctVal,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppTheme.neonAmber, width: 1.5),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.psychology_rounded, color: AppTheme.neonAmber, size: 28),
+              SizedBox(width: 10),
+              Text(
+                'Neural Strategy Hint',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                explanation,
+                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('KEEP THINKING', style: TextStyle(color: Colors.white60)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _provider.revealHint();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.neonAmber),
+              child: const Text(
+                'REVEAL VALUE',
+                style: TextStyle(color: AppTheme.backgroundColor, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Color _getDifficultyColor(String diff) {
@@ -105,7 +208,7 @@ class _GameScreenState extends State<GameScreen> {
                           onEraseTap: _provider.eraseCell,
                           onUndoTap: _provider.undo,
                           onNotesTap: _provider.toggleNotesMode,
-                          onHintTap: _provider.revealHint,
+                          onHintTap: _showHintExplanationDialog,
                           notesModeActive: _provider.notesMode,
                           canUndo: _provider.canUndo,
                         ),

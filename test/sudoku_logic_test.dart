@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dart_sudoku/core/sudoku_logic.dart';
+import 'package:dart_sudoku/core/sudoku_analyzer.dart';
 
 void main() {
   group('SudokuLogic Tests', () {
@@ -70,6 +71,28 @@ void main() {
           expect(solvedPuzzleCopy[r][c], puzzle.solvedBoard[r][c]);
         }
       }
+    });
+
+    group('SudokuAnalyzer Tests', () {
+      test('Should identify Sole Candidate', () {
+        final board = List.generate(9, (_) => List.filled(9, 0));
+        for (int c = 1; c < 9; c++) {
+          board[0][c] = c + 1; // 2..9
+        }
+        final explanation = SudokuAnalyzer.analyzeCell(board, 0, 0, 1);
+        expect(explanation.contains('Sole Candidate'), true);
+      });
+
+      test('Should identify Hidden Single in Row', () {
+        final board = List.generate(9, (_) => List.filled(9, 0));
+        for (int c = 2; c < 9; c++) {
+          board[0][c] = c + 1; // 3..9
+        }
+        board[1][1] = 1; // Conflict blocks '1' at board[0][1]
+        
+        final explanation = SudokuAnalyzer.analyzeCell(board, 0, 0, 1);
+        expect(explanation.contains('Hidden Single in Row'), true);
+      });
     });
   });
 }
