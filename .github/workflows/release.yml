@@ -1,0 +1,58 @@
+name: Build & Release Windows App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release Windows EXE Setup
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Flutter Heuristics
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run Diagnostics (Tests)
+        run: flutter test
+
+      - name: Build Windows Standalone Release
+        run: flutter build windows --release
+
+      - name: Package Windows Installer Setup (Inno Setup)
+        run: |
+          iscc setup.iss
+
+      - name: Upload Installer Asset to Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: build/windows/installer/SudokuNexusSetup.exe
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Sudoku Nexus Setup Installer - Windows Release
+            
+            Welcome to the release of **Sudoku Nexus**!
+            
+            ### Installation Instructions
+            1. Download the `SudokuNexusSetup.exe` file below.
+            2. Run the installer and follow the prompt guidelines to install.
+            3. Launch from your desktop shortcut!
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
