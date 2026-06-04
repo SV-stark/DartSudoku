@@ -244,7 +244,7 @@ class _GameScreenState extends State<GameScreen> {
         
         // Progress or clues count
         Text(
-          'Total Clues: ${widget.difficulty.toLowerCase() == 'easy' ? '46' : widget.difficulty.toLowerCase() == 'medium' ? '36' : '28'}',
+          'Total Clues: ${widget.difficulty.toLowerCase() == 'easy' ? '28' : widget.difficulty.toLowerCase() == 'medium' ? '23' : '18'}',
           style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
         ),
       ],

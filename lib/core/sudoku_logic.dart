@@ -190,48 +190,59 @@ class SudokuLogic {
   /// Generates a Sudoku game with a unique solution according to [difficulty].
   /// [difficulty] can be 'easy', 'medium', or 'hard'.
   static SudokuPuzzle generatePuzzle(String difficulty) {
-    List<List<int>> solved = generateSolvedBoard();
-    List<List<int>> puzzle = copyBoard(solved);
-
     int cellsToRemove;
     switch (difficulty.toLowerCase()) {
       case 'easy':
-        cellsToRemove = 35; // Leaves 46 clues
-        break;
-      case 'medium':
-        cellsToRemove = 45; // Leaves 36 clues
-        break;
-      case 'hard':
         cellsToRemove = 53; // Leaves 28 clues
         break;
+      case 'medium':
+        cellsToRemove = 58; // Leaves 23 clues
+        break;
+      case 'hard':
+        cellsToRemove = 63; // Leaves 18 clues
+        break;
       default:
-        cellsToRemove = 40;
+        cellsToRemove = 53;
     }
 
-    // List of coordinates to try removing
-    List<Point<int>> coordinates = [];
-    for (int r = 0; r < 9; r++) {
-      for (int c = 0; c < 9; c++) {
-        coordinates.add(Point(r, c));
+    List<List<int>> solved = [];
+    List<List<int>> puzzle = [];
+
+    // Retry generation if a random removal sequence gets stuck before reaching target
+    for (int attempt = 0; attempt < 5; attempt++) {
+      solved = generateSolvedBoard();
+      puzzle = copyBoard(solved);
+
+      // List of coordinates to try removing
+      List<Point<int>> coordinates = [];
+      for (int r = 0; r < 9; r++) {
+        for (int c = 0; c < 9; c++) {
+          coordinates.add(Point(r, c));
+        }
       }
-    }
-    coordinates.shuffle();
+      coordinates.shuffle();
 
-    int removed = 0;
-    for (var point in coordinates) {
-      if (removed >= cellsToRemove) break;
+      int removed = 0;
+      for (var point in coordinates) {
+        if (removed >= cellsToRemove) break;
 
-      int r = point.x;
-      int c = point.y;
-      int backup = puzzle[r][c];
+        int r = point.x;
+        int c = point.y;
+        int backup = puzzle[r][c];
 
-      puzzle[r][c] = 0;
+        puzzle[r][c] = 0;
 
-      // Verify that the puzzle still has a unique solution
-      if (hasUniqueSolution(puzzle)) {
-        removed++;
-      } else {
-        puzzle[r][c] = backup; // Revert if removal causes multiple solutions
+        // Verify that the puzzle still has a unique solution
+        if (hasUniqueSolution(puzzle)) {
+          removed++;
+        } else {
+          puzzle[r][c] = backup; // Revert if removal causes multiple solutions
+        }
+      }
+
+      // If we hit the target removed count, or came within 1 cell, accept the puzzle
+      if (removed >= cellsToRemove - 1) {
+        break;
       }
     }
 
