@@ -6,11 +6,11 @@ void main() {
     WidgetTester tester,
   ) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const SudokuNexusApp());
+    await tester.pumpWidget(const DartSudokuApp());
 
     // Verify that the title text and elements are present.
-    expect(find.text('SUDOKU'), findsOneWidget);
-    expect(find.text('N E X U S'), findsOneWidget);
+    expect(find.text('DartSudoku'), findsOneWidget);
+    expect(find.text('ELEGANT & INTELLIGENT'), findsOneWidget);
 
     // Verify that the game levels section is rendered
     expect(find.text('Select Game Level'), findsOneWidget);

@@ -3,30 +3,26 @@ import 'ui/screens/home_screen.dart';
 import 'ui/theme.dart';
 
 void main() {
-  runApp(const SudokuNexusApp());
+  runApp(const DartSudokuApp());
 }
 
-/// The root widget of the Sudoku Nexus application.
-class SudokuNexusApp extends StatelessWidget {
-  const SudokuNexusApp({super.key});
+/// The root widget of the DartSudoku application.
+class DartSudokuApp extends StatelessWidget {
+  const DartSudokuApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sudoku Nexus',
+      title: 'DartSudoku',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: AppTheme.backgroundColor,
-        fontFamily:
-            'Inter', // Default system font fallback or standard Roboto/Inter
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppTheme.neonViolet,
-          brightness: Brightness.dark,
-          background: AppTheme.backgroundColor,
-          surface: AppTheme.surfaceColor,
-        ),
         useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppTheme.primarySeed,
+          brightness: Brightness.dark,
+        ),
+        fontFamily: 'Inter',
       ),
       home: const HomeScreen(),
     );

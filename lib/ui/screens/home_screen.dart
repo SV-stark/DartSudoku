@@ -12,175 +12,81 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _glowAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _glowAnimation = Tween<double>(
-      begin: 4.0,
-      end: 15.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
+class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              // Floating stats button
-              Positioned(
-                top: 16,
-                right: 16,
-                child: GestureDetector(
-                  onTap: _openStats,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: AppTheme.glassBoxDecoration(
-                      borderRadius: 30,
-                      borderColor: AppTheme.neonCyan.withOpacity(0.3),
-                    ),
-                    child: const Icon(
-                      Icons.insights_rounded,
-                      color: AppTheme.neonCyan,
-                      size: 24,
-                    ),
-                  ),
-                ),
+      body: Stack(
+        children: [
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 32.0,
               ),
-              // Ambient glowing blobs in the background
-              _buildBackgroundBlob(
-                color: AppTheme.neonViolet.withOpacity(0.12),
-                top: -100,
-                left: -50,
-                size: 300,
-              ),
-              _buildBackgroundBlob(
-                color: AppTheme.neonCyan.withOpacity(0.12),
-                bottom: -100,
-                right: -50,
-                size: 300,
-              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header Logo Area
+                  _buildLogo(context),
+                  const SizedBox(height: 40),
 
-              Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0,
-                    vertical: 32.0,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Header Logo Area
-                      _buildLogo(),
-                      const SizedBox(height: 50),
+                  // Play Mode Card
+                  _buildPlayCard(context),
+                  const SizedBox(height: 20),
 
-                      // Play Mode Card
-                      _buildPlayCard(),
-                      const SizedBox(height: 24),
-
-                      // Solver Mode Card
-                      _buildSolverCard(),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBackgroundBlob({
-    required Color color,
-    double? top,
-    double? bottom,
-    double? left,
-    double? right,
-    required double size,
-  }) {
-    return Positioned(
-      top: top,
-      bottom: bottom,
-      left: left,
-      right: right,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: color, blurRadius: 100, spreadRadius: 30),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLogo() {
-    return Column(
-      children: [
-        AnimatedBuilder(
-          animation: _glowAnimation,
-          builder: (context, child) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.neonViolet, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.neonViolet.withOpacity(0.35),
-                    blurRadius: _glowAnimation.value,
-                    spreadRadius: 2,
-                  ),
+                  // Solver Mode Card
+                  _buildSolverCard(context),
                 ],
               ),
-              child: const Icon(
-                Icons.grid_3x3_rounded,
-                size: 56,
-                color: Colors.white,
-              ),
-            );
-          },
+            ),
+          ),
+
+          // Floating stats button in Material 3 style
+          Positioned(
+            top: 16,
+            right: 16,
+            child: FloatingActionButton.small(
+              onPressed: _openStats,
+              tooltip: 'Analytics',
+              child: const Icon(Icons.insights_rounded),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogo(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        Icon(
+          Icons.grid_3x3_rounded,
+          size: 64,
+          color: theme.colorScheme.primary,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         Text(
-          'SUDOKU',
-          style: AppTheme.titleStyle.copyWith(fontSize: 38),
+          'DartSudoku',
+          style: theme.textTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+            color: theme.colorScheme.onBackground,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 4),
         Text(
-          'N E X U S',
-          style: TextStyle(
-            color: AppTheme.neonCyan,
-            fontSize: 16,
+          'ELEGANT & INTELLIGENT',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.primary,
             fontWeight: FontWeight.bold,
-            letterSpacing: 8,
-            shadows: [
-              Shadow(color: AppTheme.neonCyan.withOpacity(0.5), blurRadius: 10),
-            ],
+            letterSpacing: 3.0,
           ),
           textAlign: TextAlign.center,
         ),
@@ -188,26 +94,28 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildPlayCard() {
-    return AppTheme.glassEffect(
+  Widget _buildPlayCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.play_circle_outline_rounded,
-                  color: AppTheme.neonCyan,
+                  color: theme.colorScheme.primary,
                   size: 28,
                 ),
                 const SizedBox(width: 12),
                 Text(
                   'Select Game Level',
-                  style: AppTheme.titleStyle.copyWith(
-                    fontSize: 20,
-                    shadows: [],
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
@@ -215,24 +123,29 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(height: 8),
             Text(
               'Challenge yourself with standard game boards featuring unique, solvable solutions.',
-              style: AppTheme.subtitleStyle.copyWith(fontSize: 14),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _buildDifficultyButton(
+              context,
               label: 'EASY',
-              color: AppTheme.neonGreen,
+              color: Colors.green,
               onTap: () => _startGame('easy'),
             ),
             const SizedBox(height: 12),
             _buildDifficultyButton(
+              context,
               label: 'MEDIUM',
-              color: AppTheme.neonAmber,
+              color: Colors.orange,
               onTap: () => _startGame('medium'),
             ),
             const SizedBox(height: 12),
             _buildDifficultyButton(
+              context,
               label: 'HARD',
-              color: AppTheme.neonRed,
+              color: Colors.red,
               onTap: () => _startGame('hard'),
             ),
           ],
@@ -241,14 +154,16 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildSolverCard() {
-    return AppTheme.glassEffect(
-      borderColor: AppTheme.neonCyan.withOpacity(0.2),
+  Widget _buildSolverCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 1,
       child: InkWell(
         onTap: _openSolver,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(20.0),
           child: Row(
             children: [
               Expanded(
@@ -257,17 +172,16 @@ class _HomeScreenState extends State<HomeScreen>
                   children: [
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.calculate_rounded,
-                          color: AppTheme.neonCyan,
+                          color: theme.colorScheme.primary,
                           size: 28,
                         ),
                         const SizedBox(width: 12),
                         Text(
                           'Sudoku Solver',
-                          style: AppTheme.titleStyle.copyWith(
-                            fontSize: 20,
-                            shadows: [],
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -275,23 +189,18 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 8),
                     Text(
                       'Input your custom grids and let the solver resolve the board completely, or query answers for selected squares only.',
-                      style: AppTheme.subtitleStyle.copyWith(fontSize: 13),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.neonCyan.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: AppTheme.neonCyan,
-                  size: 20,
-                ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: theme.colorScheme.primary,
+                size: 20,
               ),
             ],
           ),
@@ -300,31 +209,30 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildDifficultyButton({
+  Widget _buildDifficultyButton(
+    BuildContext context, {
     required String label,
     required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.6), width: 1.5),
-          color: color.withOpacity(0.08),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
-            ),
-          ),
+    final theme = Theme.of(context);
+
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: color.withOpacity(0.5), width: 1.5),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: theme.brightness == Brightness.dark
+              ? color.withOpacity(0.9)
+              : color,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 2,
         ),
       ),
     );

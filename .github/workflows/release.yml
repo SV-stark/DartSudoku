@@ -41,15 +41,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: build/windows/installer/SudokuNexusSetup.exe
+          files: build/windows/installer/DartSudokuSetup.exe
           name: Release ${{ github.ref_name }}
           body: |
-            ## Sudoku Nexus Setup Installer - Windows Release
+            ## DartSudoku Setup Installer - Windows Release
             
-            Welcome to the release of **Sudoku Nexus**!
+            Welcome to the release of **DartSudoku**!
             
             ### Installation Instructions
-            1. Download the `SudokuNexusSetup.exe` file below.
+            1. Download the `DartSudokuSetup.exe` file below.
             2. Run the installer and follow the prompt guidelines to install.
             3. Launch from your desktop shortcut!
           draft: false

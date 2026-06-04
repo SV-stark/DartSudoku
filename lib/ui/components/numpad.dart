@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../theme.dart';
 
-/// A custom input keyboard and tool panel.
+/// A custom input keyboard and tool panel designed with Material 3.
 class SudokuNumpad extends StatelessWidget {
   final Function(int number) onNumberTap;
   final VoidCallback onEraseTap;
@@ -32,67 +31,84 @@ class SudokuNumpad extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (hasExtraTools) ...[_buildToolRow(), const SizedBox(height: 20)],
-        _buildNumberGrid(),
+        if (hasExtraTools) ...[
+          _buildToolRow(context),
+          const SizedBox(height: 16),
+        ],
+        _buildNumberGrid(context),
       ],
     );
   }
 
-  Widget _buildToolRow() {
+  Widget _buildToolRow(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         // Undo Button
         if (onUndoTap != null)
           _buildToolButton(
+            context,
             icon: Icons.undo_rounded,
             label: 'Undo',
             onTap: canUndo ? onUndoTap : null,
             isActive: false,
-            color: canUndo ? AppTheme.neonCyan : Colors.white.withOpacity(0.2),
+            color: Theme.of(context).colorScheme.primary,
           ),
 
         // Erase Button
         _buildToolButton(
+          context,
           icon: Icons.backspace_rounded,
           label: 'Erase',
           onTap: onEraseTap,
           isActive: false,
-          color: AppTheme.neonRed,
+          color: Theme.of(context).colorScheme.error,
         ),
 
         // Notes Mode Button
         if (onNotesTap != null)
           _buildToolButton(
+            context,
             icon: notesModeActive ? Icons.edit_rounded : Icons.edit_off_rounded,
             label: 'Notes',
             onTap: onNotesTap,
             isActive: notesModeActive,
-            color: AppTheme.neonViolet,
+            color: Theme.of(context).colorScheme.secondary,
           ),
 
         // Hint Button
         if (onHintTap != null)
           _buildToolButton(
+            context,
             icon: Icons.lightbulb_rounded,
             label: 'Hint',
             onTap: onHintTap,
             isActive: false,
-            color: AppTheme.neonAmber,
+            color: Theme.of(context).colorScheme.tertiary,
           ),
       ],
     );
   }
 
-  Widget _buildToolButton({
+  Widget _buildToolButton(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required VoidCallback? onTap,
     required bool isActive,
     required Color color,
   }) {
-    final Color buttonColor = isActive ? color : color.withOpacity(0.15);
-    final Color iconColor = isActive ? AppTheme.backgroundColor : color;
+    final theme = Theme.of(context);
+    final Color buttonColor = isActive
+        ? theme.colorScheme.primaryContainer
+        : (onTap != null
+              ? color.withOpacity(0.12)
+              : theme.colorScheme.surfaceVariant.withOpacity(0.3));
+    final Color iconColor = isActive
+        ? theme.colorScheme.onPrimaryContainer
+        : (onTap != null
+              ? color
+              : theme.colorScheme.onSurface.withOpacity(0.3));
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -100,24 +116,17 @@ class SudokuNumpad extends StatelessWidget {
         GestureDetector(
           onTap: onTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: buttonColor,
               shape: BoxShape.circle,
               border: Border.all(
-                color: onTap != null ? color : Colors.white.withOpacity(0.1),
+                color: isActive
+                    ? theme.colorScheme.primary
+                    : Colors.transparent,
                 width: 1.5,
               ),
-              boxShadow: isActive
-                  ? [
-                      BoxShadow(
-                        color: color.withOpacity(0.4),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
             ),
             child: Icon(icon, size: 24, color: iconColor),
           ),
@@ -127,8 +136,8 @@ class SudokuNumpad extends StatelessWidget {
           label,
           style: TextStyle(
             color: onTap != null
-                ? Colors.white.withOpacity(0.8)
-                : Colors.white.withOpacity(0.3),
+                ? theme.colorScheme.onSurface
+                : theme.colorScheme.onSurface.withOpacity(0.35),
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
@@ -137,10 +146,8 @@ class SudokuNumpad extends StatelessWidget {
     );
   }
 
-  Widget _buildNumberGrid() {
-    // Laying out 1 to 9 in a row structure or grid structure
-    // Standard layouts: 1-9 in a 3x3 layout or a row
-    // Let's do a 3x3 grid but stylized as glassmorphic keys!
+  Widget _buildNumberGrid(BuildContext context) {
+    final theme = Theme.of(context);
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -153,29 +160,20 @@ class SudokuNumpad extends StatelessWidget {
       itemCount: 9,
       itemBuilder: (context, index) {
         final int number = index + 1;
-        return GestureDetector(
-          onTap: () => onNumberTap(number),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceGlassColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppTheme.neonIndigo.withOpacity(0.3),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 5,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
+        return Card(
+          elevation: 1,
+          color: theme.colorScheme.surfaceVariant,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => onNumberTap(number),
             child: Center(
               child: Text(
                 '$number',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),

@@ -24,7 +24,6 @@ class _GameScreenState extends State<GameScreen> {
     super.initState();
     _provider = SudokuGameProvider();
     _provider.addListener(_onStateChange);
-    // Trigger game creation on next frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _provider.newGame(widget.difficulty);
     });
@@ -43,17 +42,30 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
+  Color _getDifficultyColor(String diff) {
+    switch (diff.toLowerCase()) {
+      case 'easy':
+        return Colors.green;
+      case 'medium':
+        return Colors.orange;
+      case 'hard':
+        return Colors.red;
+      default:
+        return Colors.blue;
+    }
+  }
+
   void _showHintExplanationDialog() {
     final int r = _provider.selectedRow;
     final int c = _provider.selectedCol;
+    final theme = Theme.of(context);
 
     if (r == -1 || c == -1) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppTheme.neonCyan.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
           content: const Text(
             'Select an empty cell to receive a hint explanation!',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
         ),
       );
@@ -63,11 +75,8 @@ class _GameScreenState extends State<GameScreen> {
     if (_provider.isOriginalClue[r][c]) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppTheme.neonCyan.withOpacity(0.9),
-          content: const Text(
-            'Starting clues cannot have hints.',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
+          behavior: SnackBarBehavior.floating,
+          content: const Text('Starting clues cannot have hints.'),
         ),
       );
       return;
@@ -77,11 +86,8 @@ class _GameScreenState extends State<GameScreen> {
     if (_provider.currentBoard[r][c] == correctVal) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppTheme.neonGreen.withOpacity(0.9),
-          content: const Text(
-            'This cell is already correctly solved!',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
+          behavior: SnackBarBehavior.floating,
+          content: const Text('This cell is already correctly solved!'),
         ),
       );
       return;
@@ -98,23 +104,23 @@ class _GameScreenState extends State<GameScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceColor,
+          backgroundColor: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppTheme.neonAmber, width: 1.5),
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.5)),
           ),
-          title: const Row(
+          title: Row(
             children: [
               Icon(
                 Icons.psychology_rounded,
-                color: AppTheme.neonAmber,
+                color: theme.colorScheme.primary,
                 size: 28,
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Text(
-                'Neural Strategy Hint',
+                'Strategy Explainer',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                 ),
@@ -127,8 +133,8 @@ class _GameScreenState extends State<GameScreen> {
             children: [
               Text(
                 explanation,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -138,9 +144,11 @@ class _GameScreenState extends State<GameScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
+              child: Text(
                 'KEEP THINKING',
-                style: TextStyle(color: Colors.white60),
+                style: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
+                ),
               ),
             ),
             ElevatedButton(
@@ -149,14 +157,12 @@ class _GameScreenState extends State<GameScreen> {
                 _provider.revealHint();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.neonAmber,
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
               ),
               child: const Text(
                 'REVEAL VALUE',
-                style: TextStyle(
-                  color: AppTheme.backgroundColor,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -165,125 +171,101 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Color _getDifficultyColor(String diff) {
-    switch (diff.toLowerCase()) {
-      case 'easy':
-        return AppTheme.neonGreen;
-      case 'medium':
-        return AppTheme.neonAmber;
-      case 'hard':
-        return AppTheme.neonRed;
-      default:
-        return AppTheme.neonCyan;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final gameColor = _getDifficultyColor(_provider.difficulty);
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              // Core Layout
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
-                    // Header Row
-                    _buildHeader(gameColor),
-                    const SizedBox(height: 16),
-                    // Stats Row
-                    _buildStatsRow(gameColor),
-                    const SizedBox(height: 16),
-                    // Sudoku Board
-                    Expanded(
-                      child: Center(
-                        child: _provider.status == GameStatus.loading
-                            ? _buildLoadingState()
-                            : SudokuGrid(
-                                board: _provider.currentBoard,
-                                selectedRow: _provider.selectedRow,
-                                selectedCol: _provider.selectedCol,
-                                isClue: _provider.isOriginalClue,
-                                notes: _provider.notes,
-                                solvedBoard: _provider.solvedBoard,
-                                onCellTap: (r, c) {
-                                  _provider.selectCell(r, c);
-                                },
-                              ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Core Layout
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  // Header Row
+                  _buildHeader(gameColor),
+                  const SizedBox(height: 16),
+                  // Stats Row
+                  _buildStatsRow(gameColor),
+                  const SizedBox(height: 16),
+                  // Sudoku Board
+                  Expanded(
+                    child: Center(
+                      child: _provider.status == GameStatus.loading
+                          ? _buildLoadingState()
+                          : SudokuGrid(
+                              board: _provider.currentBoard,
+                              selectedRow: _provider.selectedRow,
+                              selectedCol: _provider.selectedCol,
+                              isClue: _provider.isOriginalClue,
+                              notes: _provider.notes,
+                              solvedBoard: _provider.solvedBoard,
+                              onCellTap: (r, c) {
+                                _provider.selectCell(r, c);
+                              },
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Controls (Numpad + Tool Buttons)
+                  if (_provider.status != GameStatus.loading)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: SudokuNumpad(
+                        onNumberTap: _provider.enterNumber,
+                        onEraseTap: _provider.eraseCell,
+                        onUndoTap: _provider.undo,
+                        onNotesTap: _provider.toggleNotesMode,
+                        onHintTap: _showHintExplanationDialog,
+                        notesModeActive: _provider.notesMode,
+                        canUndo: _provider.canUndo,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    // Controls (Numpad + Tool Buttons)
-                    if (_provider.status != GameStatus.loading)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: SudokuNumpad(
-                          onNumberTap: _provider.enterNumber,
-                          onEraseTap: _provider.eraseCell,
-                          onUndoTap: _provider.undo,
-                          onNotesTap: _provider.toggleNotesMode,
-                          onHintTap: _showHintExplanationDialog,
-                          notesModeActive: _provider.notesMode,
-                          canUndo: _provider.canUndo,
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
+            ),
 
-              // Game Pause Overlay
-              if (_provider.status == GameStatus.paused) _buildPausedOverlay(),
+            // Game Pause Overlay
+            if (_provider.status == GameStatus.paused) _buildPausedOverlay(),
 
-              // Game Over Overlay
-              if (_provider.status == GameStatus.gameOver)
-                _buildGameOverOverlay(),
+            // Game Over Overlay
+            if (_provider.status == GameStatus.gameOver)
+              _buildGameOverOverlay(),
 
-              // Win Overlay
-              if (_provider.status == GameStatus.won) _buildWinOverlay(),
-            ],
-          ),
+            // Win Overlay
+            if (_provider.status == GameStatus.won) _buildWinOverlay(),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildHeader(Color difficultyColor) {
+    final theme = Theme.of(context);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         // Back Button
-        GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceGlassColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
-            ),
-            child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          ),
+        IconButton.filledTonal(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_rounded),
         ),
 
-        // Difficulty Badge
+        // Difficulty Badge (FilterChip-like styling)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: difficultyColor.withOpacity(0.1),
+            color: difficultyColor.withOpacity(0.12),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: difficultyColor, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: difficultyColor.withOpacity(0.15),
-                blurRadius: 8,
-              ),
-            ],
+            border: Border.all(
+              color: difficultyColor.withOpacity(0.5),
+              width: 1.0,
+            ),
           ),
           child: Text(
             _provider.difficulty.toUpperCase(),
@@ -291,55 +273,41 @@ class _GameScreenState extends State<GameScreen> {
               color: difficultyColor,
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
+              letterSpacing: 1.0,
             ),
           ),
         ),
 
-        // Timer Panel
-        GestureDetector(
-          onTap: () {
+        // Timer Panel (Material 3 Chip look)
+        ActionChip(
+          avatar: Icon(
+            _provider.status == GameStatus.paused
+                ? Icons.play_arrow_rounded
+                : Icons.pause_rounded,
+            color: theme.colorScheme.primary,
+            size: 18,
+          ),
+          label: Text(
+            _provider.formattedTime,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          onPressed: () {
             if (_provider.status == GameStatus.playing) {
               _provider.pauseGame();
             } else if (_provider.status == GameStatus.paused) {
               _provider.resumeGame();
             }
           },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: AppTheme.glassBoxDecoration(
-              borderRadius: 20,
-              borderColor: AppTheme.neonCyan.withOpacity(0.3),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _provider.status == GameStatus.paused
-                      ? Icons.play_arrow_rounded
-                      : Icons.pause_rounded,
-                  color: AppTheme.neonCyan,
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _provider.formattedTime,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'Courier',
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ],
     );
   }
 
   Widget _buildStatsRow(Color difficultyColor) {
+    final theme = Theme.of(context);
     if (_provider.status == GameStatus.loading)
       return const SizedBox(height: 20);
 
@@ -349,16 +317,16 @@ class _GameScreenState extends State<GameScreen> {
         // Mistakes Counter
         Row(
           children: [
-            const Icon(
+            Icon(
               Icons.error_outline_rounded,
-              color: AppTheme.neonRed,
+              color: theme.colorScheme.error,
               size: 18,
             ),
             const SizedBox(width: 6),
             Text(
               'Mistakes: ',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),
@@ -370,8 +338,8 @@ class _GameScreenState extends State<GameScreen> {
                   Icons.favorite_rounded,
                   size: 16,
                   color: isMistake
-                      ? AppTheme.neonRed.withOpacity(0.15)
-                      : AppTheme.neonRed,
+                      ? theme.colorScheme.error.withOpacity(0.15)
+                      : theme.colorScheme.error,
                 ),
               );
             }),
@@ -385,34 +353,36 @@ class _GameScreenState extends State<GameScreen> {
               : widget.difficulty.toLowerCase() == 'medium'
               ? '27'
               : '22'}',
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+          style: TextStyle(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 13,
+          ),
         ),
       ],
     );
   }
 
   Widget _buildLoadingState() {
-    return AppTheme.glassEffect(
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 32.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.neonViolet),
-              strokeWidth: 3,
-            ),
+            const CircularProgressIndicator(strokeWidth: 3),
             const SizedBox(height: 24),
             Text(
               'Generating Solvable Grid...',
-              style: AppTheme.subtitleStyle.copyWith(color: Colors.white),
+              style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
               'Aligning numeric pathways',
-              style: AppTheme.subtitleStyle.copyWith(
-                fontSize: 12,
-                color: Colors.white.withOpacity(0.5),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -422,55 +392,49 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildPausedOverlay() {
+    final theme = Theme.of(context);
+
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.6),
-        child: AppTheme.glassEffect(
-          fillColor: Colors.black.withOpacity(0.4),
-          borderColor: AppTheme.neonCyan.withOpacity(0.2),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.pause_circle_filled_rounded,
-                  size: 80,
-                  color: AppTheme.neonCyan,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'GAME PAUSED',
-                  style: AppTheme.titleStyle.copyWith(
-                    shadows: [
-                      const Shadow(color: AppTheme.neonCyan, blurRadius: 15),
-                    ],
+        color: Colors.black.withOpacity(0.55),
+        child: Center(
+          child: Card(
+            elevation: 8,
+            color: theme.colorScheme.surface,
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: 40.0,
+                horizontal: 24.0,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.pause_circle_outline_rounded,
+                    size: 64,
+                    color: theme.colorScheme.primary,
                   ),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  onPressed: _provider.resumeGame,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.neonCyan,
-                    foregroundColor: AppTheme.backgroundColor,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 5,
-                  ),
-                  child: const Text(
-                    'RESUME PLAY',
-                    style: TextStyle(
-                      fontSize: 16,
+                  const SizedBox(height: 20),
+                  Text(
+                    'Game Paused',
+                    style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 28),
+                  FilledButton(
+                    onPressed: _provider.resumeGame,
+                    child: const Text(
+                      'RESUME PLAY',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -479,15 +443,17 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildGameOverOverlay() {
+    final theme = Theme.of(context);
+
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withOpacity(0.65),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: AppTheme.glassEffect(
-              borderColor: AppTheme.neonRed.withOpacity(0.4),
-              fillColor: AppTheme.surfaceColor.withOpacity(0.8),
+            child: Card(
+              elevation: 8,
+              color: theme.colorScheme.surface,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   vertical: 40.0,
@@ -496,25 +462,25 @@ class _GameScreenState extends State<GameScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.gpp_bad_rounded,
-                      size: 80,
-                      color: AppTheme.neonRed,
+                      size: 64,
+                      color: theme.colorScheme.error,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     Text(
                       'GAME OVER',
-                      style: AppTheme.titleStyle.copyWith(
-                        color: AppTheme.neonRed,
-                        shadows: [
-                          const Shadow(color: AppTheme.neonRed, blurRadius: 15),
-                        ],
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: theme.colorScheme.error,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'You committed 3 mistakes and terminated the neural matrix.',
-                      style: AppTheme.subtitleStyle.copyWith(fontSize: 14),
+                      'You committed 3 mistakes and terminated the board.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
@@ -523,31 +489,17 @@ class _GameScreenState extends State<GameScreen> {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: BorderSide(
-                                color: Colors.white.withOpacity(0.2),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
                             child: const Text('EXIT MENU'),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: ElevatedButton(
+                          child: FilledButton(
                             onPressed: () =>
                                 _provider.newGame(widget.difficulty),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.neonRed,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: theme.colorScheme.error,
+                              foregroundColor: theme.colorScheme.onError,
                             ),
                             child: const Text('TRY AGAIN'),
                           ),
@@ -565,15 +517,17 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildWinOverlay() {
+    final theme = Theme.of(context);
+
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withOpacity(0.65),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: AppTheme.glassEffect(
-              borderColor: AppTheme.neonGreen.withOpacity(0.4),
-              fillColor: AppTheme.surfaceColor.withOpacity(0.8),
+            child: Card(
+              elevation: 8,
+              color: theme.colorScheme.surface,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   vertical: 40.0,
@@ -582,28 +536,25 @@ class _GameScreenState extends State<GameScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.emoji_events_rounded,
-                      size: 80,
-                      color: AppTheme.neonGreen,
+                    Icon(
+                      Icons.emoji_events_outlined,
+                      size: 64,
+                      color: theme.colorScheme.primary,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     Text(
                       'VICTORY',
-                      style: AppTheme.titleStyle.copyWith(
-                        color: AppTheme.neonGreen,
-                        shadows: [
-                          const Shadow(
-                            color: AppTheme.neonGreen,
-                            blurRadius: 15,
-                          ),
-                        ],
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'You successfully solved the matrix in ${_provider.formattedTime}!',
-                      style: AppTheme.subtitleStyle.copyWith(fontSize: 14),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
@@ -612,32 +563,14 @@ class _GameScreenState extends State<GameScreen> {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: BorderSide(
-                                color: Colors.white.withOpacity(0.2),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
                             child: const Text('EXIT'),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: ElevatedButton(
+                          child: FilledButton(
                             onPressed: () =>
                                 _provider.newGame(widget.difficulty),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.neonGreen,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
                             child: const Text('PLAY AGAIN'),
                           ),
                         ),

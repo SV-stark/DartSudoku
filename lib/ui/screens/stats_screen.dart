@@ -37,62 +37,59 @@ class _StatsScreenState extends State<StatsScreen> {
   Color _getDifficultyColor(String diff) {
     switch (diff.toLowerCase()) {
       case 'easy':
-        return AppTheme.neonGreen;
+        return Colors.green;
       case 'medium':
-        return AppTheme.neonAmber;
+        return Colors.orange;
       case 'hard':
-        return AppTheme.neonRed;
+        return Colors.red;
       default:
-        return AppTheme.neonCyan;
+        return Colors.blue;
     }
   }
 
   Future<void> _confirmReset() async {
+    final theme = Theme.of(context);
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceColor,
+          backgroundColor: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppTheme.neonRed, width: 1.5),
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
           ),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_rounded, color: AppTheme.neonRed),
-              SizedBox(width: 10),
-              Text(
+              Icon(Icons.warning_rounded, color: theme.colorScheme.error),
+              const SizedBox(width: 10),
+              const Text(
                 'Reset Analytics',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
           ),
           content: const Text(
-            'Are you sure you want to permanently clear all Sudoku statistics, records, and win streaks? This action cannot be undone.',
+            'Are you sure you want to permanently clear all DartSudoku statistics, records, and win streaks? This action cannot be undone.',
             style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text(
+              child: Text(
                 'CANCEL',
-                style: TextStyle(color: Colors.white60),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.neonRed,
+                backgroundColor: theme.colorScheme.error,
+                foregroundColor: theme.colorScheme.onError,
               ),
               child: const Text(
                 'RESET',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -106,14 +103,8 @@ class _StatsScreenState extends State<StatsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: AppTheme.neonRed.withOpacity(0.9),
-            content: const Text(
-              'Statistics cleared successfully.',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            behavior: SnackBarBehavior.floating,
+            content: const Text('Statistics cleared successfully.'),
           ),
         );
       }
@@ -122,108 +113,84 @@ class _StatsScreenState extends State<StatsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              _buildHeader(),
-              Expanded(
-                child: FutureBuilder<GameStats>(
-                  future: _statsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == snapshot.connectionState &&
-                        !snapshot.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppTheme.neonCyan,
-                          ),
-                        ),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Error loading analytics data.',
-                          style: AppTheme.subtitleStyle,
-                        ),
-                      );
-                    }
+    final theme = Theme.of(context);
 
-                    final stats = snapshot.data!;
-                    return ListView(
-                      padding: const EdgeInsets.all(16.0),
-                      children: [
-                        _buildStreakSection(stats),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Difficulty Breakdown',
-                          style: AppTheme.titleStyle.copyWith(
-                            fontSize: 20,
-                            shadows: [],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...['easy', 'medium', 'hard'].map((difficulty) {
-                          final diffStats = stats.difficultyStats[difficulty]!;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: _buildDifficultyCard(difficulty, diffStats),
-                          );
-                        }),
-                      ],
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            _buildHeader(),
+            Expanded(
+              child: FutureBuilder<GameStats>(
+                future: _statsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Error loading analytics data.',
+                        style: theme.textTheme.titleMedium,
+                      ),
                     );
-                  },
-                ),
+                  }
+
+                  final stats = snapshot.data!;
+                  return ListView(
+                    padding: const EdgeInsets.all(16.0),
+                    children: [
+                      _buildStreakSection(stats),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Difficulty Breakdown',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...['easy', 'medium', 'hard'].map((difficulty) {
+                        final diffStats = stats.difficultyStats[difficulty]!;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: _buildDifficultyCard(difficulty, diffStats),
+                        );
+                      }),
+                    ],
+                  );
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceGlassColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
-              ),
-              child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            ),
+          IconButton.filledTonal(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back_rounded),
           ),
           Text(
-            'NEURAL ANALYTICS',
-            style: AppTheme.titleStyle.copyWith(
-              fontSize: 20,
-              shadows: [const Shadow(color: AppTheme.neonCyan, blurRadius: 8)],
+            'DartSudoku Analytics',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
           ),
-          GestureDetector(
-            onTap: _confirmReset,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceGlassColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.neonRed.withOpacity(0.2)),
-              ),
-              child: const Icon(
-                Icons.delete_sweep_rounded,
-                color: AppTheme.neonRed,
-              ),
+          IconButton.filledTonal(
+            onPressed: _confirmReset,
+            icon: Icon(
+              Icons.delete_sweep_rounded,
+              color: theme.colorScheme.error,
             ),
           ),
         ],
@@ -232,8 +199,10 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Widget _buildStreakSection(GameStats stats) {
-    return AppTheme.glassEffect(
-      borderColor: AppTheme.neonCyan.withOpacity(0.3),
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 1,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
         child: Row(
@@ -241,27 +210,26 @@ class _StatsScreenState extends State<StatsScreen> {
             Expanded(
               child: Column(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.local_fire_department_rounded,
-                    color: AppTheme.neonAmber,
+                    color: theme.colorScheme.primary,
                     size: 40,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '${stats.currentStreak}',
-                    style: const TextStyle(
-                      fontSize: 28,
+                    style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'CURRENT STREAK',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withOpacity(0.5),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurfaceVariant.withOpacity(
+                        0.7,
+                      ),
                     ),
                   ),
                 ],
@@ -270,32 +238,31 @@ class _StatsScreenState extends State<StatsScreen> {
             Container(
               width: 1,
               height: 70,
-              color: Colors.white.withOpacity(0.1),
+              color: theme.colorScheme.outlineVariant,
             ),
             Expanded(
               child: Column(
                 children: [
                   const Icon(
                     Icons.emoji_events_rounded,
-                    color: AppTheme.neonGreen,
+                    color: Colors.orange,
                     size: 40,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '${stats.maxStreak}',
-                    style: const TextStyle(
-                      fontSize: 28,
+                    style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'MAX WIN STREAK',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withOpacity(0.5),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurfaceVariant.withOpacity(
+                        0.7,
+                      ),
                     ),
                   ),
                 ],
@@ -308,13 +275,14 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Widget _buildDifficultyCard(String difficulty, SudokuStats stats) {
+    final theme = Theme.of(context);
     final Color diffColor = _getDifficultyColor(difficulty);
     final double winRate = stats.gamesPlayed > 0
         ? (stats.gamesWon / stats.gamesPlayed) * 100
         : 0.0;
 
-    return AppTheme.glassEffect(
-      borderColor: diffColor.withOpacity(0.3),
+    return Card(
+      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -329,18 +297,13 @@ class _StatsScreenState extends State<StatsScreen> {
                     color: diffColor,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                    shadows: [
-                      Shadow(color: diffColor.withOpacity(0.5), blurRadius: 8),
-                    ],
+                    letterSpacing: 1,
                   ),
                 ),
                 Text(
                   'Win Rate: ${winRate.toStringAsFixed(1)}%',
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
                   ),
                 ),
               ],
@@ -365,21 +328,23 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Widget _buildStatLabel(String label, String value) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 16,
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.5)),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+          ),
         ),
       ],
     );

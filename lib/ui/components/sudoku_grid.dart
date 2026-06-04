@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 
-/// An interactive, beautifully rendered 9x9 Sudoku grid.
+/// An interactive, beautifully rendered 9x9 Sudoku grid built with Material 3 styling.
 class SudokuGrid extends StatelessWidget {
   final List<List<int>> board;
   final int selectedRow;
@@ -24,22 +24,15 @@ class SudokuGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final outlineColor = Theme.of(context).colorScheme.outline;
+
     return AspectRatio(
       aspectRatio: 1.0,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppTheme.neonIndigo.withOpacity(0.8),
-            width: 2.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.neonIndigo.withOpacity(0.25),
-              blurRadius: 20,
-              spreadRadius: 2,
-            ),
-          ],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: outlineColor, width: 2.0),
+          color: Theme.of(context).colorScheme.surface,
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -61,7 +54,7 @@ class SudokuGrid extends StatelessWidget {
     final int value = board[r][c];
     final bool isSelected = r == selectedRow && c == selectedCol;
 
-    // Check if cell shares row, col, or 3x3 box with the selected cell
+    // Check relationship with selected cell
     bool isRelated = false;
     if (selectedRow != -1 && selectedCol != -1 && !isSelected) {
       bool sameRow = r == selectedRow;
@@ -71,59 +64,61 @@ class SudokuGrid extends StatelessWidget {
       isRelated = sameRow || sameCol || sameBox;
     }
 
-    // Check if cell contains the same non-zero number as the selected cell
+    // Check matching digit
     bool isSameNumber = false;
     if (selectedRow != -1 && selectedCol != -1 && !isSelected && value != 0) {
       int selectedValue = board[selectedRow][selectedCol];
       isSameNumber = value == selectedValue;
     }
 
-    // Determine background color
+    // Colors mapping from M3 Theme
     Color cellBg = Colors.transparent;
     if (isSelected) {
-      cellBg = AppTheme.selectedCellBg;
+      cellBg = AppTheme.selectedCellBg(context);
     } else if (isSameNumber) {
-      cellBg = AppTheme.sameNumberBg;
+      cellBg = AppTheme.sameNumberBg(context);
     } else if (isRelated) {
-      cellBg = AppTheme.relatedCellBg;
+      cellBg = AppTheme.relatedCellBg(context);
     }
 
-    // Determine borders to avoid doubling line thickness
-    BorderSide topBorder = BorderSide(
-      color: (r % 3 == 0 && r != 0)
-          ? AppTheme.neonIndigo
-          : AppTheme.neonIndigo.withOpacity(0.2),
-      width: (r % 3 == 0 && r != 0) ? 2.2 : 0.8,
-    );
-    BorderSide leftBorder = BorderSide(
-      color: (c % 3 == 0 && c != 0)
-          ? AppTheme.neonIndigo
-          : AppTheme.neonIndigo.withOpacity(0.2),
-      width: (c % 3 == 0 && c != 0) ? 2.2 : 0.8,
-    );
+    // Material 3 Borders
+    final outlineColor = Theme.of(context).colorScheme.outline;
+    final outlineVariantColor = Theme.of(context).colorScheme.outlineVariant;
 
-    // Determine text style
+    // Bottom and Right border drawing
+    BorderSide bottomBorder = r == 8
+        ? BorderSide.none
+        : BorderSide(
+            color: (r % 3 == 2) ? outlineColor : outlineVariantColor,
+            width: (r % 3 == 2) ? 2.0 : 0.6,
+          );
+    BorderSide rightBorder = c == 8
+        ? BorderSide.none
+        : BorderSide(
+            color: (c % 3 == 2) ? outlineColor : outlineVariantColor,
+            width: (c % 3 == 2) ? 2.0 : 0.6,
+          );
+
+    // Number typography
     TextStyle textStyle;
     final bool isStartingClue = isClue != null && isClue![r][c];
 
     if (value != 0) {
       if (isStartingClue) {
-        textStyle = const TextStyle(
-          color: AppTheme.clueText,
+        textStyle = TextStyle(
+          color: AppTheme.clueText(context),
           fontSize: 22,
           fontWeight: FontWeight.bold,
         );
       } else {
-        // User entered number
         final bool isCorrect =
             solvedBoard == null || solvedBoard![r][c] == value;
         textStyle = TextStyle(
-          color: isCorrect ? AppTheme.userText : AppTheme.neonRed,
+          color: isCorrect
+              ? AppTheme.userText(context)
+              : AppTheme.errorText(context),
           fontSize: 22,
           fontWeight: FontWeight.bold,
-          shadows: !isCorrect
-              ? [const Shadow(color: AppTheme.neonRed, blurRadius: 8)]
-              : null,
         );
       }
     } else {
@@ -136,29 +131,27 @@ class SudokuGrid extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: cellBg,
-          border: Border(
-            top: r == 0 ? BorderSide.none : topBorder,
-            left: c == 0 ? BorderSide.none : leftBorder,
-          ),
+          border: Border(bottom: bottomBorder, right: rightBorder),
         ),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
+        child: Container(
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            border: isSelected
-                ? Border.all(color: AppTheme.neonCyan, width: 2)
-                : null,
-          ),
+          decoration: isSelected
+              ? BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2.0,
+                  ),
+                )
+              : null,
           child: value != 0
               ? Center(child: Text('$value', style: textStyle))
-              : _buildNotes(r, c),
+              : _buildNotes(context, r, c),
         ),
       ),
     );
   }
 
-  Widget _buildNotes(int r, int c) {
+  Widget _buildNotes(BuildContext context, int r, int c) {
     if (notes == null) return const SizedBox.shrink();
     final cellNotes = notes![r][c];
     if (cellNotes.isEmpty) return const SizedBox.shrink();
@@ -178,9 +171,9 @@ class SudokuGrid extends StatelessWidget {
                   child: Center(
                     child: Text(
                       hasNote ? '$noteNum' : '',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 9,
-                        color: AppTheme.noteText,
+                        color: AppTheme.noteText(context),
                         fontWeight: FontWeight.bold,
                       ),
                     ),

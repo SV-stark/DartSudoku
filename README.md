@@ -1,6 +1,6 @@
-# 🌌 Sudoku Nexus
+# 🌌 DartSudoku
 
-A premium, neon-themed Sudoku game and solver built with Flutter. Sudoku Nexus blends state-of-the-art glassmorphic aesthetics with a robust backtracking engine to deliver a highly interactive Sudoku playing and solving experience.
+An elegant, modern Sudoku game and solver built with Flutter. DartSudoku implements a clean Material 3 design and uses a robust backtracking engine to deliver a highly interactive Sudoku playing and solving experience.
 
 ---
 
@@ -15,7 +15,7 @@ A premium, neon-themed Sudoku game and solver built with Flutter. Sudoku Nexus b
 - **Interactive Tooling**:
   - **Notes (Pencil Mode)**: Jot down candidates. The board automatically filters out conflicting notes in the same row, column, or 3x3 box as you input correct values.
   - **Mistake Limits**: Play with up to 3 mistake hearts.
-  - **Hint System**: Need a hand? Get a hint for your currently selected cell.
+  - **Hint System**: Need a hand? Request a hint to open the Strategy Explainer, explaining why a number belongs in a cell.
   - **Unlimited Undo**: Complete list of moves kept so you can backtrack your steps at any time.
   - **Pause/Resume Timer**: Keep track of your solving time with an active game timer that can be paused at will.
 
@@ -28,9 +28,9 @@ Enter your custom Sudoku grids (e.g., from newspapers or other puzzles) and choo
 ---
 
 ## 🎨 Design Language
-- **Visuals**: Futuristic deep-space dark theme (`#050811`) highlighted by glowing neon violet, cyan, and indigo accents.
-- **Components**: Glassmorphic panels featuring radial blur and thin neon borders.
-- **Micro-Animations**: Smooth scale/fade transitions on selection, input updates, and game overlays.
+- **Visuals**: Modern, elegant Material 3 dark theme powered by an indigo seed color.
+- **Components**: Solid cards, clean chips, and filled/tonal button configurations.
+- **Grid Layout**: Features highly visible line separators utilising theme `outline` (thick lines separating 3x3 grids) and `outlineVariant` (thin lines separating individual cells) color palettes.
 
 ---
 
@@ -71,7 +71,7 @@ The build artifacts will be located in: `build/windows/x64/runner/Release/`
 
 - **Core Framework**: Flutter (Dart)
 - **State Management**: Built-in `ChangeNotifier` state controllers (`SudokuGameProvider` & `SudokuSolverProvider`) designed for zero-dependency high performance.
-- **Sudoku Algorithm**: Optimized recursive backtracking utilizing the **Minimum Remaining Values (MRV)** heuristic to speed up unique solution validation and complete solvers.
+- **Sudoku Heuristic Algorithm**: Optimized recursive backtracking utilizing the **Minimum Remaining Values (MRV)** heuristic to speed up unique solution validation and complete solvers.
 
 ---
 
