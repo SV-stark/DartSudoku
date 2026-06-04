@@ -193,16 +193,16 @@ class SudokuLogic {
     int cellsToRemove;
     switch (difficulty.toLowerCase()) {
       case 'easy':
-        cellsToRemove = 53; // Leaves 28 clues
+        cellsToRemove = 49; // Leaves 32 clues
         break;
       case 'medium':
-        cellsToRemove = 58; // Leaves 23 clues
+        cellsToRemove = 54; // Leaves 27 clues
         break;
       case 'hard':
-        cellsToRemove = 63; // Leaves 18 clues
+        cellsToRemove = 59; // Leaves 22 clues
         break;
       default:
-        cellsToRemove = 53;
+        cellsToRemove = 49;
     }
 
     List<List<int>> solved = [];

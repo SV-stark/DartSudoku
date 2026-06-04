@@ -8,9 +8,9 @@ A premium, neon-themed Sudoku game and solver built with Flutter. Sudoku Nexus b
 
 ### 🎮 Play Mode
 - **Three Levels of Difficulty**:
-  - **Easy**: 28 starting clues.
-  - **Medium**: 23 starting clues.
-  - **Hard**: 18 starting clues.
+  - **Easy**: 32 starting clues.
+  - **Medium**: 27 starting clues.
+  - **Hard**: 22 starting clues.
 - **Engine-Backed Unique Solutions**: All generated puzzles are guaranteed to have exactly **one unique solution**.
 - **Interactive Tooling**:
   - **Notes (Pencil Mode)**: Jot down candidates. The board automatically filters out conflicting notes in the same row, column, or 3x3 box as you input correct values.
