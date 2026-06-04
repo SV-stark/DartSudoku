@@ -5,7 +5,7 @@ import '../theme.dart';
 class SudokuNumpad extends StatelessWidget {
   final Function(int number) onNumberTap;
   final VoidCallback onEraseTap;
-  
+
   // Optional parameters for play mode controls
   final VoidCallback? onUndoTap;
   final VoidCallback? onNotesTap;
@@ -26,15 +26,13 @@ class SudokuNumpad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool hasExtraTools = onUndoTap != null || onNotesTap != null || onHintTap != null;
+    final bool hasExtraTools =
+        onUndoTap != null || onNotesTap != null || onHintTap != null;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (hasExtraTools) ...[
-          _buildToolRow(),
-          const SizedBox(height: 20),
-        ],
+        if (hasExtraTools) ...[_buildToolRow(), const SizedBox(height: 20)],
         _buildNumberGrid(),
       ],
     );
@@ -53,7 +51,7 @@ class SudokuNumpad extends StatelessWidget {
             isActive: false,
             color: canUndo ? AppTheme.neonCyan : Colors.white.withOpacity(0.2),
           ),
-        
+
         // Erase Button
         _buildToolButton(
           icon: Icons.backspace_rounded,
@@ -62,7 +60,7 @@ class SudokuNumpad extends StatelessWidget {
           isActive: false,
           color: AppTheme.neonRed,
         ),
-        
+
         // Notes Mode Button
         if (onNotesTap != null)
           _buildToolButton(
@@ -72,7 +70,7 @@ class SudokuNumpad extends StatelessWidget {
             isActive: notesModeActive,
             color: AppTheme.neonViolet,
           ),
-        
+
         // Hint Button
         if (onHintTap != null)
           _buildToolButton(
@@ -117,22 +115,20 @@ class SudokuNumpad extends StatelessWidget {
                         color: color.withOpacity(0.4),
                         blurRadius: 10,
                         spreadRadius: 1,
-                      )
+                      ),
                     ]
                   : null,
             ),
-            child: Icon(
-              icon,
-              size: 24,
-              color: iconColor,
-            ),
+            child: Icon(icon, size: 24, color: iconColor),
           ),
         ),
         const SizedBox(height: 6),
         Text(
           label,
           style: TextStyle(
-            color: onTap != null ? Colors.white.withOpacity(0.8) : Colors.white.withOpacity(0.3),
+            color: onTap != null
+                ? Colors.white.withOpacity(0.8)
+                : Colors.white.withOpacity(0.3),
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),

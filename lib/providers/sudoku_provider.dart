@@ -27,8 +27,14 @@ enum GameStatus { idle, loading, playing, paused, won, gameOver }
 class SudokuGameProvider extends ChangeNotifier {
   List<List<int>> _currentBoard = List.generate(9, (_) => List.filled(9, 0));
   List<List<int>> _solvedBoard = List.generate(9, (_) => List.filled(9, 0));
-  List<List<bool>> _isOriginalClue = List.generate(9, (_) => List.filled(9, false));
-  List<List<Set<int>>> _notes = List.generate(9, (_) => List.generate(9, (_) => {}));
+  List<List<bool>> _isOriginalClue = List.generate(
+    9,
+    (_) => List.filled(9, false),
+  );
+  List<List<Set<int>>> _notes = List.generate(
+    9,
+    (_) => List.generate(9, (_) => {}),
+  );
 
   int _selectedRow = -1;
   int _selectedCol = -1;
@@ -83,7 +89,10 @@ class SudokuGameProvider extends ChangeNotifier {
     _difficulty = difficulty;
     _currentBoard = SudokuLogic.copyBoard(puzzle.puzzleBoard);
     _solvedBoard = SudokuLogic.copyBoard(puzzle.solvedBoard);
-    _isOriginalClue = List.generate(9, (r) => List.generate(9, (c) => puzzle.puzzleBoard[r][c] != 0));
+    _isOriginalClue = List.generate(
+      9,
+      (r) => List.generate(9, (c) => puzzle.puzzleBoard[r][c] != 0),
+    );
     _notes = List.generate(9, (_) => List.generate(9, (_) => {}));
 
     _selectedRow = -1;
@@ -106,10 +115,15 @@ class SudokuGameProvider extends ChangeNotifier {
 
   /// Saves the current board state to undo history
   void _saveToHistory() {
-    _undoHistory.add(BoardState(
-      board: SudokuLogic.copyBoard(_currentBoard),
-      notes: List.generate(9, (r) => List.generate(9, (c) => Set.from(_notes[r][c]))),
-    ));
+    _undoHistory.add(
+      BoardState(
+        board: SudokuLogic.copyBoard(_currentBoard),
+        notes: List.generate(
+          9,
+          (r) => List.generate(9, (c) => Set.from(_notes[r][c])),
+        ),
+      ),
+    );
     // Limit history size to 20 to prevent excessive memory usage
     if (_undoHistory.length > 20) {
       _undoHistory.removeAt(0);
@@ -138,7 +152,8 @@ class SudokuGameProvider extends ChangeNotifier {
         _notes[_selectedRow][_selectedCol].remove(number);
       } else {
         _notes[_selectedRow][_selectedCol].add(number);
-        _currentBoard[_selectedRow][_selectedCol] = 0; // Clear cell if placing a note
+        _currentBoard[_selectedRow][_selectedCol] =
+            0; // Clear cell if placing a note
       }
     } else {
       // Direct number input
@@ -175,7 +190,9 @@ class SudokuGameProvider extends ChangeNotifier {
     if (_status != GameStatus.playing) return;
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
-    if (_currentBoard[_selectedRow][_selectedCol] == 0 && _notes[_selectedRow][_selectedCol].isEmpty) return;
+    if (_currentBoard[_selectedRow][_selectedCol] == 0 &&
+        _notes[_selectedRow][_selectedCol].isEmpty)
+      return;
 
     _saveToHistory();
     _currentBoard[_selectedRow][_selectedCol] = 0;
@@ -188,7 +205,7 @@ class SudokuGameProvider extends ChangeNotifier {
     if (_status != GameStatus.playing) return;
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
-    
+
     int correctVal = _solvedBoard[_selectedRow][_selectedCol];
     if (_currentBoard[_selectedRow][_selectedCol] == correctVal) return;
 
@@ -319,11 +336,12 @@ class SudokuSolverProvider extends ChangeNotifier {
   /// 1st way: Complete solve of the board.
   void solveComplete() {
     _errorMessage = null;
-    
+
     // Check general rules validity of the current user inputs
     if (!SudokuLogic.isBoardValid(_solverBoard)) {
       _status = SolverStatus.error;
-      _errorMessage = "The grid contains rule violations (duplicate numbers in rows, columns, or 3x3 grids)!";
+      _errorMessage =
+          "The grid contains rule violations (duplicate numbers in rows, columns, or 3x3 grids)!";
       notifyListeners();
       return;
     }
@@ -340,7 +358,8 @@ class SudokuSolverProvider extends ChangeNotifier {
       _status = SolverStatus.solved;
     } else {
       _status = SolverStatus.error;
-      _errorMessage = "This Sudoku layout is unsolvable. Please check your entered values.";
+      _errorMessage =
+          "This Sudoku layout is unsolvable. Please check your entered values.";
     }
     notifyListeners();
   }
@@ -379,10 +398,12 @@ class SudokuSolverProvider extends ChangeNotifier {
     if (success) {
       int solvedVal = solvedCopy[_selectedRow][_selectedCol];
       _solverBoard[_selectedRow][_selectedCol] = solvedVal;
-      _status = SolverStatus.idle; // return to idle so they can solve more cells
+      _status =
+          SolverStatus.idle; // return to idle so they can solve more cells
     } else {
       _status = SolverStatus.error;
-      _errorMessage = "This Sudoku layout is unsolvable. Cannot solve the selected cell.";
+      _errorMessage =
+          "This Sudoku layout is unsolvable. Cannot solve the selected cell.";
     }
     notifyListeners();
   }

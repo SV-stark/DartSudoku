@@ -12,7 +12,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _glowAnimation;
 
@@ -23,10 +24,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat(reverse: true);
-    
-    _glowAnimation = Tween<double>(begin: 4.0, end: 15.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+
+    _glowAnimation = Tween<double>(
+      begin: 4.0,
+      end: 15.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -39,9 +41,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
-        ),
+        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: SafeArea(
           child: Stack(
             children: [
@@ -78,10 +78,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 right: -50,
                 size: 300,
               ),
-              
+
               Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 32.0,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -89,11 +92,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       // Header Logo Area
                       _buildLogo(),
                       const SizedBox(height: 50),
-                      
+
                       // Play Mode Card
                       _buildPlayCard(),
                       const SizedBox(height: 24),
-                      
+
                       // Solver Mode Card
                       _buildSolverCard(),
                     ],
@@ -127,11 +130,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           color: color,
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(
-              color: color,
-              blurRadius: 100,
-              spreadRadius: 30,
-            ),
+            BoxShadow(color: color, blurRadius: 100, spreadRadius: 30),
           ],
         ),
       ),
@@ -148,10 +147,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppTheme.neonViolet,
-                  width: 2.5,
-                ),
+                border: Border.all(color: AppTheme.neonViolet, width: 2.5),
                 boxShadow: [
                   BoxShadow(
                     color: AppTheme.neonViolet.withOpacity(0.35),
@@ -183,10 +179,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             fontWeight: FontWeight.bold,
             letterSpacing: 8,
             shadows: [
-              Shadow(
-                color: AppTheme.neonCyan.withOpacity(0.5),
-                blurRadius: 10,
-              )
+              Shadow(color: AppTheme.neonCyan.withOpacity(0.5), blurRadius: 10),
             ],
           ),
           textAlign: TextAlign.center,
@@ -204,11 +197,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           children: [
             Row(
               children: [
-                const Icon(Icons.play_circle_outline_rounded, color: AppTheme.neonCyan, size: 28),
+                const Icon(
+                  Icons.play_circle_outline_rounded,
+                  color: AppTheme.neonCyan,
+                  size: 28,
+                ),
                 const SizedBox(width: 12),
                 Text(
                   'Select Game Level',
-                  style: AppTheme.titleStyle.copyWith(fontSize: 20, shadows: []),
+                  style: AppTheme.titleStyle.copyWith(
+                    fontSize: 20,
+                    shadows: [],
+                  ),
                 ),
               ],
             ),
@@ -257,11 +257,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.calculate_rounded, color: AppTheme.neonCyan, size: 28),
+                        const Icon(
+                          Icons.calculate_rounded,
+                          color: AppTheme.neonCyan,
+                          size: 28,
+                        ),
                         const SizedBox(width: 12),
                         Text(
                           'Sudoku Solver',
-                          style: AppTheme.titleStyle.copyWith(fontSize: 20, shadows: []),
+                          style: AppTheme.titleStyle.copyWith(
+                            fontSize: 20,
+                            shadows: [],
+                          ),
                         ),
                       ],
                     ),
@@ -335,18 +342,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _openSolver() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const SolverScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const SolverScreen()),
     );
   }
 
   void _openStats() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const StatsScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const StatsScreen()),
     );
   }
 }

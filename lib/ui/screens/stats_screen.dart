@@ -26,7 +26,8 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   String _formatTime(double totalSeconds) {
-    if (totalSeconds <= 0 || totalSeconds.isNaN || totalSeconds.isInfinite) return '--:--';
+    if (totalSeconds <= 0 || totalSeconds.isNaN || totalSeconds.isInfinite)
+      return '--:--';
     int secs = totalSeconds.round();
     int minutes = secs ~/ 60;
     int seconds = secs % 60;
@@ -62,7 +63,10 @@ class _StatsScreenState extends State<StatsScreen> {
               SizedBox(width: 10),
               Text(
                 'Reset Analytics',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -73,12 +77,23 @@ class _StatsScreenState extends State<StatsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('CANCEL', style: TextStyle(color: Colors.white60)),
+              child: const Text(
+                'CANCEL',
+                style: TextStyle(color: Colors.white60),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.neonRed),
-              child: const Text('RESET', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.neonRed,
+              ),
+              child: const Text(
+                'RESET',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -94,7 +109,10 @@ class _StatsScreenState extends State<StatsScreen> {
             backgroundColor: AppTheme.neonRed.withOpacity(0.9),
             content: const Text(
               'Statistics cleared successfully.',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         );
@@ -116,10 +134,13 @@ class _StatsScreenState extends State<StatsScreen> {
                 child: FutureBuilder<GameStats>(
                   future: _statsFuture,
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == snapshot.connectionState && !snapshot.hasData) {
+                    if (snapshot.connectionState == snapshot.connectionState &&
+                        !snapshot.hasData) {
                       return const Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.neonCyan),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTheme.neonCyan,
+                          ),
                         ),
                       );
                     }
@@ -140,7 +161,10 @@ class _StatsScreenState extends State<StatsScreen> {
                         const SizedBox(height: 24),
                         Text(
                           'Difficulty Breakdown',
-                          style: AppTheme.titleStyle.copyWith(fontSize: 20, shadows: []),
+                          style: AppTheme.titleStyle.copyWith(
+                            fontSize: 20,
+                            shadows: [],
+                          ),
                         ),
                         const SizedBox(height: 12),
                         ...['easy', 'medium', 'hard'].map((difficulty) {
@@ -184,9 +208,7 @@ class _StatsScreenState extends State<StatsScreen> {
             'NEURAL ANALYTICS',
             style: AppTheme.titleStyle.copyWith(
               fontSize: 20,
-              shadows: [
-                const Shadow(color: AppTheme.neonCyan, blurRadius: 8),
-              ],
+              shadows: [const Shadow(color: AppTheme.neonCyan, blurRadius: 8)],
             ),
           ),
           GestureDetector(
@@ -198,7 +220,10 @@ class _StatsScreenState extends State<StatsScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: AppTheme.neonRed.withOpacity(0.2)),
               ),
-              child: const Icon(Icons.delete_sweep_rounded, color: AppTheme.neonRed),
+              child: const Icon(
+                Icons.delete_sweep_rounded,
+                color: AppTheme.neonRed,
+              ),
             ),
           ),
         ],
@@ -216,16 +241,28 @@ class _StatsScreenState extends State<StatsScreen> {
             Expanded(
               child: Column(
                 children: [
-                  const Icon(Icons.local_fire_department_rounded, color: AppTheme.neonAmber, size: 40),
+                  const Icon(
+                    Icons.local_fire_department_rounded,
+                    color: AppTheme.neonAmber,
+                    size: 40,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     '${stats.currentStreak}',
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'CURRENT STREAK',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.5)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
                   ),
                 ],
               ),
@@ -238,16 +275,28 @@ class _StatsScreenState extends State<StatsScreen> {
             Expanded(
               child: Column(
                 children: [
-                  const Icon(Icons.emoji_events_rounded, color: AppTheme.neonGreen, size: 40),
+                  const Icon(
+                    Icons.emoji_events_rounded,
+                    color: AppTheme.neonGreen,
+                    size: 40,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     '${stats.maxStreak}',
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'MAX WIN STREAK',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.5)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
                   ),
                 ],
               ),
@@ -260,7 +309,9 @@ class _StatsScreenState extends State<StatsScreen> {
 
   Widget _buildDifficultyCard(String difficulty, SudokuStats stats) {
     final Color diffColor = _getDifficultyColor(difficulty);
-    final double winRate = stats.gamesPlayed > 0 ? (stats.gamesWon / stats.gamesPlayed) * 100 : 0.0;
+    final double winRate = stats.gamesPlayed > 0
+        ? (stats.gamesWon / stats.gamesPlayed) * 100
+        : 0.0;
 
     return AppTheme.glassEffect(
       borderColor: diffColor.withOpacity(0.3),
@@ -300,7 +351,10 @@ class _StatsScreenState extends State<StatsScreen> {
               children: [
                 _buildStatLabel('Played', '${stats.gamesPlayed}'),
                 _buildStatLabel('Won', '${stats.gamesWon}'),
-                _buildStatLabel('Best Time', _formatTime(stats.bestTime.toDouble())),
+                _buildStatLabel(
+                  'Best Time',
+                  _formatTime(stats.bestTime.toDouble()),
+                ),
                 _buildStatLabel('Avg Time', _formatTime(stats.averageTime)),
               ],
             ),
@@ -316,7 +370,11 @@ class _StatsScreenState extends State<StatsScreen> {
       children: [
         Text(
           value,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         const SizedBox(height: 4),
         Text(

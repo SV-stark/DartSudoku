@@ -16,11 +16,11 @@ class SudokuStats {
   });
 
   Map<String, dynamic> toJson() => {
-        'gamesPlayed': gamesPlayed,
-        'gamesWon': gamesWon,
-        'bestTime': bestTime,
-        'totalTime': totalTime,
-      };
+    'gamesPlayed': gamesPlayed,
+    'gamesWon': gamesWon,
+    'bestTime': bestTime,
+    'totalTime': totalTime,
+  };
 
   factory SudokuStats.fromJson(Map<String, dynamic> json) {
     return SudokuStats(
@@ -60,10 +60,10 @@ class GameStats {
   }
 
   Map<String, dynamic> toJson() => {
-        'difficultyStats': difficultyStats.map((k, v) => MapEntry(k, v.toJson())),
-        'currentStreak': currentStreak,
-        'maxStreak': maxStreak,
-      };
+    'difficultyStats': difficultyStats.map((k, v) => MapEntry(k, v.toJson())),
+    'currentStreak': currentStreak,
+    'maxStreak': maxStreak,
+  };
 
   factory GameStats.fromJson(Map<String, dynamic> json) {
     var diffStats = <String, SudokuStats>{};

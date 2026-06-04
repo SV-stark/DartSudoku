@@ -2,7 +2,12 @@
 class SudokuAnalyzer {
   /// Analyzes the selected empty cell (row, col) on [currentBoard] and returns
   /// a logical explanation of why [correctVal] is the correct number.
-  static String analyzeCell(List<List<int>> currentBoard, int row, int col, int correctVal) {
+  static String analyzeCell(
+    List<List<int>> currentBoard,
+    int row,
+    int col,
+    int correctVal,
+  ) {
     // 1. Check for Sole Candidate (Naked Single)
     List<int> validCandidates = [];
     for (int val = 1; val <= 9; val++) {
@@ -65,7 +70,12 @@ class SudokuAnalyzer {
   }
 
   /// Helper to check if val is valid in currentBoard at (row, col) ignoring the cell's current value
-  static bool isValidForAnalysis(List<List<int>> board, int row, int col, int val) {
+  static bool isValidForAnalysis(
+    List<List<int>> board,
+    int row,
+    int col,
+    int val,
+  ) {
     // Check row
     for (int c = 0; c < 9; c++) {
       if (c != col && board[row][c] == val) return false;

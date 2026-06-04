@@ -62,17 +62,20 @@ class _SolverScreenState extends State<SolverScreen> {
               children: [
                 _buildHelpItem(
                   number: '1',
-                  text: 'Select any cell on the grid and use the number keys below to fill in your Sudoku puzzle.',
+                  text:
+                      'Select any cell on the grid and use the number keys below to fill in your Sudoku puzzle.',
                 ),
                 const SizedBox(height: 12),
                 _buildHelpItem(
                   number: '2',
-                  text: 'Use the "Erase" button to clear a number from the selected cell.',
+                  text:
+                      'Use the "Erase" button to clear a number from the selected cell.',
                 ),
                 const SizedBox(height: 12),
                 _buildHelpItem(
                   number: '3',
-                  text: 'Choose your solving method:\n• Solve Complete: Solves all empty cells on the grid.\n• Solve Selected: Computes the solution and fills in ONLY the selected square.',
+                  text:
+                      'Choose your solving method:\n• Solve Complete: Solves all empty cells on the grid.\n• Solve Selected: Computes the solution and fills in ONLY the selected square.',
                 ),
               ],
             ),
@@ -82,7 +85,10 @@ class _SolverScreenState extends State<SolverScreen> {
               onPressed: () => Navigator.pop(context),
               child: const Text(
                 'GOT IT',
-                style: TextStyle(color: AppTheme.neonCyan, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: AppTheme.neonCyan,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -114,7 +120,11 @@ class _SolverScreenState extends State<SolverScreen> {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              height: 1.4,
+            ),
           ),
         ),
       ],
@@ -150,7 +160,7 @@ class _SolverScreenState extends State<SolverScreen> {
                         ),
                       ),
                     ),
-                    
+
                     // Dynamic Error message block
                     if (_provider.errorMessage != null) ...[
                       const SizedBox(height: 12),
@@ -181,17 +191,25 @@ class _SolverScreenState extends State<SolverScreen> {
                     child: Center(
                       child: AppTheme.glassEffect(
                         child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 32,
+                          ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.neonCyan),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppTheme.neonCyan,
+                                ),
                               ),
                               SizedBox(height: 20),
                               Text(
                                 'Solving Sudoku...',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -231,9 +249,7 @@ class _SolverScreenState extends State<SolverScreen> {
           style: AppTheme.titleStyle.copyWith(
             fontSize: 20,
             color: Colors.white,
-            shadows: [
-              const Shadow(color: AppTheme.neonCyan, blurRadius: 8),
-            ],
+            shadows: [const Shadow(color: AppTheme.neonCyan, blurRadius: 8)],
           ),
         ),
 
@@ -247,7 +263,10 @@ class _SolverScreenState extends State<SolverScreen> {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
-            child: const Icon(Icons.help_outline_rounded, color: AppTheme.neonCyan),
+            child: const Icon(
+              Icons.help_outline_rounded,
+              color: AppTheme.neonCyan,
+            ),
           ),
         ),
       ],
@@ -264,12 +283,20 @@ class _SolverScreenState extends State<SolverScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppTheme.neonRed, size: 20),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppTheme.neonRed,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _provider.errorMessage!,
-              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.3),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                height: 1.3,
+              ),
             ),
           ),
         ],
@@ -286,7 +313,9 @@ class _SolverScreenState extends State<SolverScreen> {
             // Solve Complete Button
             Expanded(
               child: GestureDetector(
-                onTap: _provider.status == SolverStatus.solving ? null : _provider.solveComplete,
+                onTap: _provider.status == SolverStatus.solving
+                    ? null
+                    : _provider.solveComplete,
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
@@ -318,7 +347,9 @@ class _SolverScreenState extends State<SolverScreen> {
             // Solve Selected Cell Button
             Expanded(
               child: GestureDetector(
-                onTap: _provider.status == SolverStatus.solving ? null : _provider.solveSelectedCell,
+                onTap: _provider.status == SolverStatus.solving
+                    ? null
+                    : _provider.solveSelectedCell,
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
@@ -345,11 +376,17 @@ class _SolverScreenState extends State<SolverScreen> {
         const SizedBox(height: 12),
         // Clear Board Button
         OutlinedButton.icon(
-          onPressed: _provider.status == SolverStatus.solving ? null : _provider.clearBoard,
+          onPressed: _provider.status == SolverStatus.solving
+              ? null
+              : _provider.clearBoard,
           icon: const Icon(Icons.refresh_rounded, size: 18),
           label: const Text(
             'CLEAR GRID',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
           ),
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.white.withOpacity(0.7),

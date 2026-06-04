@@ -29,7 +29,10 @@ class SudokuGrid extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.neonIndigo.withOpacity(0.8), width: 2.5),
+          border: Border.all(
+            color: AppTheme.neonIndigo.withOpacity(0.8),
+            width: 2.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: AppTheme.neonIndigo.withOpacity(0.25),
@@ -44,9 +47,7 @@ class SudokuGrid extends StatelessWidget {
             return Expanded(
               child: Row(
                 children: List.generate(9, (c) {
-                  return Expanded(
-                    child: _buildCell(context, r, c),
-                  );
+                  return Expanded(child: _buildCell(context, r, c));
                 }),
               ),
             );
@@ -65,7 +66,8 @@ class SudokuGrid extends StatelessWidget {
     if (selectedRow != -1 && selectedCol != -1 && !isSelected) {
       bool sameRow = r == selectedRow;
       bool sameCol = c == selectedCol;
-      bool sameBox = (r ~/ 3 == selectedRow ~/ 3) && (c ~/ 3 == selectedCol ~/ 3);
+      bool sameBox =
+          (r ~/ 3 == selectedRow ~/ 3) && (c ~/ 3 == selectedCol ~/ 3);
       isRelated = sameRow || sameCol || sameBox;
     }
 
@@ -113,18 +115,14 @@ class SudokuGrid extends StatelessWidget {
         );
       } else {
         // User entered number
-        final bool isCorrect = solvedBoard == null || solvedBoard![r][c] == value;
+        final bool isCorrect =
+            solvedBoard == null || solvedBoard![r][c] == value;
         textStyle = TextStyle(
           color: isCorrect ? AppTheme.userText : AppTheme.neonRed,
           fontSize: 22,
           fontWeight: FontWeight.bold,
           shadows: !isCorrect
-              ? [
-                  const Shadow(
-                    color: AppTheme.neonRed,
-                    blurRadius: 8,
-                  )
-                ]
+              ? [const Shadow(color: AppTheme.neonRed, blurRadius: 8)]
               : null,
         );
       }
@@ -153,12 +151,7 @@ class SudokuGrid extends StatelessWidget {
                 : null,
           ),
           child: value != 0
-              ? Center(
-                  child: Text(
-                    '$value',
-                    style: textStyle,
-                  ),
-                )
+              ? Center(child: Text('$value', style: textStyle))
               : _buildNotes(r, c),
         ),
       ),

@@ -18,7 +18,8 @@ class SudokuNexusApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppTheme.backgroundColor,
-        fontFamily: 'Inter', // Default system font fallback or standard Roboto/Inter
+        fontFamily:
+            'Inter', // Default system font fallback or standard Roboto/Inter
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppTheme.neonViolet,
           brightness: Brightness.dark,

@@ -7,7 +7,7 @@ class AppTheme {
   static const Color backgroundColor = Color(0xFF0A0E17);
   static const Color surfaceColor = Color(0xFF161F30);
   static const Color surfaceGlassColor = Color(0x9A161F30);
-  
+
   // Neon accents
   static const Color neonViolet = Color(0xFF8B5CF6);
   static const Color neonCyan = Color(0xFF06B6D4);
@@ -15,7 +15,7 @@ class AppTheme {
   static const Color neonAmber = Color(0xFFF59E0B);
   static const Color neonRed = Color(0xFFF43F5E);
   static const Color neonGreen = Color(0xFF10B981);
-  
+
   // Gradients
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [neonViolet, neonCyan],
@@ -31,21 +31,21 @@ class AppTheme {
 
   // Cell Highlighting Colors
   static const Color selectedCellBg = Color(0x3B6366F1); // Translucent Indigo
-  static const Color relatedCellBg = Color(0x0E06B6D4);  // Faint Cyan
-  static const Color sameNumberBg = Color(0x2E8B5CF6);   // Subtle Violet highlight
-  static const Color clueText = Color(0xFFF8FAFC);        // Solid Off-White
-  static const Color userText = Color(0xFF38BDF8);        // Cyan-Blue for user edits
-  static const Color noteText = Color(0xFF94A3B8);        // Muted slate gray for notes
-  
+  static const Color relatedCellBg = Color(0x0E06B6D4); // Faint Cyan
+  static const Color sameNumberBg = Color(
+    0x2E8B5CF6,
+  ); // Subtle Violet highlight
+  static const Color clueText = Color(0xFFF8FAFC); // Solid Off-White
+  static const Color userText = Color(0xFF38BDF8); // Cyan-Blue for user edits
+  static const Color noteText = Color(0xFF94A3B8); // Muted slate gray for notes
+
   // Font styles
   static TextStyle titleStyle = const TextStyle(
     color: Colors.white,
     fontSize: 28,
     fontWeight: FontWeight.bold,
     letterSpacing: 1.5,
-    shadows: [
-      Shadow(color: neonViolet, blurRadius: 10, offset: Offset(0, 0)),
-    ],
+    shadows: [Shadow(color: neonViolet, blurRadius: 10, offset: Offset(0, 0))],
   );
 
   static TextStyle subtitleStyle = TextStyle(
@@ -70,10 +70,7 @@ class AppTheme {
     return BoxDecoration(
       color: fillColor,
       borderRadius: BorderRadius.circular(borderRadius),
-      border: Border.all(
-        color: borderColor,
-        width: 1.5,
-      ),
+      border: Border.all(color: borderColor, width: 1.5),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withOpacity(0.3),

@@ -92,7 +92,11 @@ class SudokuLogic {
 
   /// Counts the number of solutions a Sudoku puzzle has, up to the given [limit].
   /// This is used to check if a board has a unique solution.
-  static int _countSolutions(List<List<int>> board, int limit, {int count = 0}) {
+  static int _countSolutions(
+    List<List<int>> board,
+    int limit, {
+    int count = 0,
+  }) {
     if (count >= limit) return count;
 
     int row = -1;
