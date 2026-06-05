@@ -15,6 +15,7 @@ class SudokuGrid extends StatelessWidget {
   final bool showMistakes;
   final int flashRow;
   final int flashCol;
+  final Map<String, Color>? customCellBgs;
 
   const SudokuGrid({
     super.key,
@@ -30,6 +31,7 @@ class SudokuGrid extends StatelessWidget {
     this.showMistakes = true,
     this.flashRow = -1,
     this.flashCol = -1,
+    this.customCellBgs,
   });
 
   @override
@@ -91,7 +93,9 @@ class SudokuGrid extends StatelessWidget {
     // Colors mapping from M3 Theme
     Color cellBg = Colors.transparent;
     final bool isFlash = r == flashRow && c == flashCol;
-    if (isFlash) {
+    if (customCellBgs != null && customCellBgs!.containsKey('$r,$c')) {
+      cellBg = customCellBgs!['$r,$c']!;
+    } else if (isFlash) {
       cellBg = Theme.of(context).colorScheme.tertiaryContainer;
     } else if (isSelected) {
       cellBg = AppTheme.selectedCellBg(context);
