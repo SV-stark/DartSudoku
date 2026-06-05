@@ -129,9 +129,20 @@ class _TutorialScreenState extends State<TutorialScreen>
         ? null
         : perm[origExpected];
 
+    // Copy missing target cell notes from Slide 1 if applicable
+    final String targetKey =
+        '${practiceSlide.highlightedRow},${practiceSlide.highlightedCol}';
+    final Map<String, Set<int>> baseNotes = Map.from(practiceSlide.notes);
+    if (!baseNotes.containsKey(targetKey)) {
+      final firstSlide = lesson.slides.first;
+      if (firstSlide.notes.containsKey(targetKey)) {
+        baseNotes[targetKey] = firstSlide.notes[targetKey]!;
+      }
+    }
+
     // Permute notes
     final Map<String, Set<int>> permutedNotes = {};
-    practiceSlide.notes.forEach((key, valSet) {
+    baseNotes.forEach((key, valSet) {
       permutedNotes[key] = valSet.map((v) => perm[v]!).toSet();
     });
 
@@ -478,11 +489,20 @@ class _TutorialScreenState extends State<TutorialScreen>
     final lesson = lessons[_currentLessonIndex];
     final slide = lesson.slides[_currentSlideIndex];
 
+    final String targetKey = '${slide.highlightedRow},${slide.highlightedCol}';
+    final Map<String, Set<int>> combinedNotes = Map.from(slide.notes);
+    if (slide.expectedValue != null && !combinedNotes.containsKey(targetKey)) {
+      final firstSlide = lesson.slides.first;
+      if (firstSlide.notes.containsKey(targetKey)) {
+        combinedNotes[targetKey] = firstSlide.notes[targetKey]!;
+      }
+    }
+
     List<List<Set<int>>> gridNotes = List.generate(
       9,
       (_) => List.generate(9, (_) => {}),
     );
-    slide.notes.forEach((key, value) {
+    combinedNotes.forEach((key, value) {
       final parts = key.split(',');
       final r = int.parse(parts[0]);
       final c = int.parse(parts[1]);
