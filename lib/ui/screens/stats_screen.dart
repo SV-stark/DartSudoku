@@ -343,9 +343,96 @@ class _StatsScreenState extends State<StatsScreen> {
                 _buildStatLabel('Avg Time', _formatTime(stats.averageTime)),
               ],
             ),
+            _buildTopTimesTable(stats, diffColor),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTopTimesTable(SudokuStats stats, Color diffColor) {
+    final theme = Theme.of(context);
+    final topTimes = stats.topTimes;
+
+    if (topTimes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Divider(color: theme.colorScheme.outlineVariant, height: 1),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              'Personal Bests',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: diffColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: topTimes.length,
+          itemBuilder: (context, idx) {
+            final record = topTimes[idx];
+            final isFirst = idx == 0;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 20,
+                        alignment: Alignment.center,
+                        child: Text(
+                          '#${idx + 1}',
+                          style: TextStyle(
+                            fontWeight: isFirst
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isFirst
+                                ? Colors.amber
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatTime(record.timeInSeconds.toDouble()),
+                        style: TextStyle(
+                          fontWeight: isFirst
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    record.date,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 

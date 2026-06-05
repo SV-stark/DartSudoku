@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,6 +45,7 @@ class SudokuGameProvider extends ChangeNotifier {
   int _mistakes = 0;
   final int maxMistakes = 3;
   String _difficulty = 'easy';
+  String? _dailyChallengeDate;
   GameStatus _status = GameStatus.idle;
 
   bool _notesMode = false;
@@ -51,12 +53,17 @@ class SudokuGameProvider extends ChangeNotifier {
   Timer? _timer;
 
   final List<BoardState> _undoHistory = [];
+  final List<BoardState> _redoHistory = [];
+
+  int _flashRow = -1;
+  int _flashCol = -1;
 
   // Settings properties
   bool _showMistakes = true;
   bool _highlightConflicts = true;
   bool _highlightIdentical = true;
   bool _endlessMode = false;
+  bool _autoRemoveNotes = true;
 
   SudokuGameProvider() {
     loadSettings();
@@ -76,17 +83,42 @@ class SudokuGameProvider extends ChangeNotifier {
   bool get notesMode => _notesMode;
   int get elapsedSeconds => _elapsedSeconds;
   bool get canUndo => _undoHistory.isNotEmpty;
+  bool get canRedo => _redoHistory.isNotEmpty;
+
+  int get flashRow => _flashRow;
+  int get flashCol => _flashCol;
 
   bool get showMistakes => _showMistakes;
   bool get highlightConflicts => _highlightConflicts;
   bool get highlightIdentical => _highlightIdentical;
   bool get endlessMode => _endlessMode;
+  bool get autoRemoveNotes => _autoRemoveNotes;
+
+  Map<int, int> get numberCounts {
+    final counts = <int, int>{};
+    for (int i = 1; i <= 9; i++) {
+      counts[i] = 9;
+    }
+    for (int r = 0; r < 9; r++) {
+      for (int c = 0; c < 9; c++) {
+        final val = _currentBoard[r][c];
+        if (val != 0) {
+          counts[val] = (counts[val] ?? 9) - 1;
+        }
+      }
+    }
+    counts.forEach((key, value) {
+      if (value < 0) counts[key] = 0;
+    });
+    return counts;
+  }
 
   Future<void> updateSettings({
     bool? showMistakes,
     bool? highlightConflicts,
     bool? highlightIdentical,
     bool? endlessMode,
+    bool? autoRemoveNotes,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (showMistakes != null) {
@@ -105,6 +137,10 @@ class SudokuGameProvider extends ChangeNotifier {
       _endlessMode = endlessMode;
       await prefs.setBool('endless_mode', endlessMode);
     }
+    if (autoRemoveNotes != null) {
+      _autoRemoveNotes = autoRemoveNotes;
+      await prefs.setBool('auto_remove_notes', autoRemoveNotes);
+    }
     notifyListeners();
   }
 
@@ -115,6 +151,7 @@ class SudokuGameProvider extends ChangeNotifier {
       _highlightConflicts = prefs.getBool('highlight_conflicts') ?? true;
       _highlightIdentical = prefs.getBool('highlight_identical') ?? true;
       _endlessMode = prefs.getBool('endless_mode') ?? false;
+      _autoRemoveNotes = prefs.getBool('auto_remove_notes') ?? true;
       notifyListeners();
     } catch (_) {}
   }
@@ -151,6 +188,7 @@ class SudokuGameProvider extends ChangeNotifier {
     );
 
     _difficulty = difficulty;
+    _dailyChallengeDate = dailyDate;
     _currentBoard = SudokuLogic.copyBoard(puzzle.puzzleBoard);
     _solvedBoard = SudokuLogic.copyBoard(puzzle.solvedBoard);
     _isOriginalClue = List.generate(
@@ -165,9 +203,13 @@ class SudokuGameProvider extends ChangeNotifier {
     _elapsedSeconds = 0;
     _notesMode = false;
     _undoHistory.clear();
+    _redoHistory.clear();
 
     _status = GameStatus.playing;
     _startTimer();
+
+    // Clear any previously saved active game since we started a new one
+    await _clearSavedGame();
 
     // Only record standard starts if not in daily challenge mode
     if (dailyDate == null) {
@@ -183,6 +225,7 @@ class SudokuGameProvider extends ChangeNotifier {
 
   /// Saves the current board state to undo history
   void _saveToHistory() {
+    _redoHistory.clear(); // Clear redo history when a new action is performed!
     _undoHistory.add(
       BoardState(
         board: SudokuLogic.copyBoard(_currentBoard),
@@ -198,13 +241,77 @@ class SudokuGameProvider extends ChangeNotifier {
     }
   }
 
+  void triggerFlash(int r, int c) {
+    _flashRow = r;
+    _flashCol = c;
+    notifyListeners();
+    Timer(const Duration(milliseconds: 400), () {
+      _flashRow = -1;
+      _flashCol = -1;
+      notifyListeners();
+    });
+  }
+
+  void _findAndFlashDifference(
+    List<List<int>> oldBoard,
+    List<List<int>> newBoard,
+  ) {
+    for (int r = 0; r < 9; r++) {
+      for (int c = 0; c < 9; c++) {
+        if (oldBoard[r][c] != newBoard[r][c]) {
+          triggerFlash(r, c);
+          return;
+        }
+      }
+    }
+  }
+
   /// Performs an undo action
   void undo() {
     if (_status != GameStatus.playing || _undoHistory.isEmpty) return;
+
+    _redoHistory.add(
+      BoardState(
+        board: SudokuLogic.copyBoard(_currentBoard),
+        notes: List.generate(
+          9,
+          (r) => List.generate(9, (c) => Set.from(_notes[r][c])),
+        ),
+      ),
+    );
+
     final prevState = _undoHistory.removeLast();
+    final oldBoard = SudokuLogic.copyBoard(_currentBoard);
     _currentBoard = prevState.board;
     _notes = prevState.notes;
+
+    _findAndFlashDifference(oldBoard, _currentBoard);
     notifyListeners();
+    _saveGameState();
+  }
+
+  /// Performs a redo action
+  void redo() {
+    if (_status != GameStatus.playing || _redoHistory.isEmpty) return;
+
+    _undoHistory.add(
+      BoardState(
+        board: SudokuLogic.copyBoard(_currentBoard),
+        notes: List.generate(
+          9,
+          (r) => List.generate(9, (c) => Set.from(_notes[r][c])),
+        ),
+      ),
+    );
+
+    final nextState = _redoHistory.removeLast();
+    final oldBoard = SudokuLogic.copyBoard(_currentBoard);
+    _currentBoard = nextState.board;
+    _notes = nextState.notes;
+
+    _findAndFlashDifference(oldBoard, _currentBoard);
+    notifyListeners();
+    _saveGameState();
   }
 
   /// Input a number from the numpad
@@ -238,22 +345,27 @@ class SudokuGameProvider extends ChangeNotifier {
           if (!_endlessMode && _mistakes >= maxMistakes) {
             _status = GameStatus.gameOver;
             _stopTimer();
+            _clearSavedGame();
             StatsManager.recordGameLoss();
           }
         }
       } else {
         // Auto-clean notes for surrounding cells in same row, column, and box
-        _cleanSurroundingNotes(_selectedRow, _selectedCol, number);
+        if (_autoRemoveNotes) {
+          _cleanSurroundingNotes(_selectedRow, _selectedCol, number);
+        }
       }
 
       // Check for win
       if (_checkWin()) {
         _status = GameStatus.won;
         _stopTimer();
+        _clearSavedGame();
         StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
       }
     }
     notifyListeners();
+    _saveGameState();
   }
 
   /// Clears the selected cell
@@ -270,6 +382,7 @@ class SudokuGameProvider extends ChangeNotifier {
     _currentBoard[_selectedRow][_selectedCol] = 0;
     _notes[_selectedRow][_selectedCol].clear();
     notifyListeners();
+    _saveGameState();
   }
 
   /// Reveals the correct value for the selected cell
@@ -284,14 +397,19 @@ class SudokuGameProvider extends ChangeNotifier {
     _saveToHistory();
     _currentBoard[_selectedRow][_selectedCol] = correctVal;
     _notes[_selectedRow][_selectedCol].clear();
-    _cleanSurroundingNotes(_selectedRow, _selectedCol, correctVal);
+
+    if (_autoRemoveNotes) {
+      _cleanSurroundingNotes(_selectedRow, _selectedCol, correctVal);
+    }
 
     if (_checkWin()) {
       _status = GameStatus.won;
       _stopTimer();
+      _clearSavedGame();
       StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
     }
     notifyListeners();
+    _saveGameState();
   }
 
   void pauseGame() {
@@ -299,6 +417,7 @@ class SudokuGameProvider extends ChangeNotifier {
       _status = GameStatus.paused;
       _stopTimer();
       notifyListeners();
+      _saveGameState();
     }
   }
 
@@ -307,6 +426,7 @@ class SudokuGameProvider extends ChangeNotifier {
       _status = GameStatus.playing;
       _startTimer();
       notifyListeners();
+      _saveGameState();
     }
   }
 
@@ -342,6 +462,7 @@ class SudokuGameProvider extends ChangeNotifier {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _elapsedSeconds++;
       notifyListeners();
+      _saveGameState();
     });
   }
 
@@ -354,6 +475,110 @@ class SudokuGameProvider extends ChangeNotifier {
   void dispose() {
     _stopTimer();
     super.dispose();
+  }
+
+  Future<void> _saveGameState() async {
+    if (_status != GameStatus.playing && _status != GameStatus.paused) {
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_difficulty', _difficulty);
+      if (_dailyChallengeDate != null) {
+        await prefs.setString('saved_daily_date', _dailyChallengeDate!);
+      } else {
+        await prefs.remove('saved_daily_date');
+      }
+      await prefs.setString('saved_current_board', jsonEncode(_currentBoard));
+      await prefs.setString('saved_solved_board', jsonEncode(_solvedBoard));
+      await prefs.setString(
+        'saved_is_original_clue',
+        jsonEncode(_isOriginalClue),
+      );
+
+      final notesList = List.generate(
+        9,
+        (r) => List.generate(9, (c) => _notes[r][c].toList()),
+      );
+      await prefs.setString('saved_notes', jsonEncode(notesList));
+      await prefs.setInt('saved_mistakes', _mistakes);
+      await prefs.setInt('saved_elapsed_seconds', _elapsedSeconds);
+      await prefs.setBool('has_saved_game', true);
+    } catch (_) {}
+  }
+
+  Future<void> _clearSavedGame() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('saved_difficulty');
+      await prefs.remove('saved_daily_date');
+      await prefs.remove('saved_current_board');
+      await prefs.remove('saved_solved_board');
+      await prefs.remove('saved_is_original_clue');
+      await prefs.remove('saved_notes');
+      await prefs.remove('saved_mistakes');
+      await prefs.remove('saved_elapsed_seconds');
+      await prefs.setBool('has_saved_game', false);
+    } catch (_) {}
+  }
+
+  Future<void> loadSavedGame() async {
+    _status = GameStatus.loading;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _difficulty = prefs.getString('saved_difficulty') ?? 'easy';
+      final dailyDate = prefs.getString('saved_daily_date');
+      _dailyChallengeDate = (dailyDate == null || dailyDate.isEmpty)
+          ? null
+          : dailyDate;
+
+      final currentBoardStr = prefs.getString('saved_current_board') ?? '';
+      final solvedBoardStr = prefs.getString('saved_solved_board') ?? '';
+      final originalClueStr = prefs.getString('saved_is_original_clue') ?? '';
+      final notesStr = prefs.getString('saved_notes') ?? '';
+
+      final dynamic currentBoardJson = jsonDecode(currentBoardStr);
+      _currentBoard = List.generate(
+        9,
+        (r) => List<int>.from(currentBoardJson[r]),
+      );
+
+      final dynamic solvedBoardJson = jsonDecode(solvedBoardStr);
+      _solvedBoard = List.generate(
+        9,
+        (r) => List<int>.from(solvedBoardJson[r]),
+      );
+
+      final dynamic originalClueJson = jsonDecode(originalClueStr);
+      _isOriginalClue = List.generate(
+        9,
+        (r) => List<bool>.from(originalClueJson[r]),
+      );
+
+      final dynamic notesJson = jsonDecode(notesStr);
+      _notes = List.generate(
+        9,
+        (r) => List.generate(9, (c) => Set<int>.from(notesJson[r][c])),
+      );
+
+      _mistakes = prefs.getInt('saved_mistakes') ?? 0;
+      _elapsedSeconds = prefs.getInt('saved_elapsed_seconds') ?? 0;
+
+      _selectedRow = -1;
+      _selectedCol = -1;
+      _notesMode = false;
+      _undoHistory.clear();
+      _redoHistory.clear();
+
+      _status = GameStatus.playing;
+      _startTimer();
+      notifyListeners();
+    } catch (_) {
+      _status = GameStatus.idle;
+      notifyListeners();
+    }
   }
 }
 

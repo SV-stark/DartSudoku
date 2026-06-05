@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme.dart';
 import 'game_screen.dart';
 
 /// Screen displaying a calendar grid of the current month where players can solve daily seeded games.
@@ -68,9 +69,8 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) =>
-            GameScreen(difficulty: difficulty, dailyChallengeDate: dateStr),
+      FadePageRoute(
+        child: GameScreen(difficulty: difficulty, dailyChallengeDate: dateStr),
       ),
     ).then((_) {
       // Reload completions after returning in case the challenge was completed

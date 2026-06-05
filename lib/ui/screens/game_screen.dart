@@ -5,6 +5,7 @@ import '../../providers/sudoku_provider.dart';
 import '../../core/sudoku_analyzer.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
+import '../components/confetti_overlay.dart';
 import '../theme.dart';
 import 'settings_sheet.dart';
 
@@ -12,34 +13,49 @@ import 'settings_sheet.dart';
 class GameScreen extends StatefulWidget {
   final String difficulty;
   final String? dailyChallengeDate;
+  final bool resumeSavedGame;
 
   const GameScreen({
     super.key,
     required this.difficulty,
     this.dailyChallengeDate,
+    this.resumeSavedGame = false,
   });
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late SudokuGameProvider _provider;
   late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _provider = SudokuGameProvider();
     _provider.addListener(_onStateChange);
     _focusNode = FocusNode();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _provider.newGame(
-        widget.difficulty,
-        dailyDate: widget.dailyChallengeDate,
-      );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (widget.resumeSavedGame) {
+        await _provider.loadSavedGame();
+      } else {
+        _provider.newGame(
+          widget.difficulty,
+          dailyDate: widget.dailyChallengeDate,
+        );
+      }
       _focusNode.requestFocus();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _provider.pauseGame();
+    }
   }
 
   void _onStateChange() {
@@ -65,6 +81,7 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _provider.removeListener(_onStateChange);
     _provider.dispose();
     _focusNode.dispose();
@@ -321,6 +338,8 @@ class _GameScreenState extends State<GameScreen> {
                         highlightConflicts: _provider.highlightConflicts,
                         highlightIdentical: _provider.highlightIdentical,
                         showMistakes: _provider.showMistakes,
+                        flashRow: _provider.flashRow,
+                        flashCol: _provider.flashCol,
                         onCellTap: (r, c) {
                           _provider.selectCell(r, c);
                         },
@@ -349,10 +368,13 @@ class _GameScreenState extends State<GameScreen> {
                         onNumberTap: _provider.enterNumber,
                         onEraseTap: _provider.eraseCell,
                         onUndoTap: _provider.undo,
+                        onRedoTap: _provider.redo,
                         onNotesTap: _provider.toggleNotesMode,
                         onHintTap: _showHintExplanationDialog,
                         notesModeActive: _provider.notesMode,
                         canUndo: _provider.canUndo,
+                        canRedo: _provider.canRedo,
+                        numberCounts: _provider.numberCounts,
                       ),
                   ],
                 ),
@@ -389,6 +411,8 @@ class _GameScreenState extends State<GameScreen> {
                           highlightConflicts: _provider.highlightConflicts,
                           highlightIdentical: _provider.highlightIdentical,
                           showMistakes: _provider.showMistakes,
+                          flashRow: _provider.flashRow,
+                          flashCol: _provider.flashCol,
                           onCellTap: (r, c) {
                             _provider.selectCell(r, c);
                           },
@@ -404,10 +428,13 @@ class _GameScreenState extends State<GameScreen> {
                     onNumberTap: _provider.enterNumber,
                     onEraseTap: _provider.eraseCell,
                     onUndoTap: _provider.undo,
+                    onRedoTap: _provider.redo,
                     onNotesTap: _provider.toggleNotesMode,
                     onHintTap: _showHintExplanationDialog,
                     notesModeActive: _provider.notesMode,
                     canUndo: _provider.canUndo,
+                    canRedo: _provider.canRedo,
+                    numberCounts: _provider.numberCounts,
                   ),
                 ),
             ],
@@ -444,7 +471,10 @@ class _GameScreenState extends State<GameScreen> {
                   _buildGameOverOverlay(),
 
                 // Win Overlay
-                if (_provider.status == GameStatus.won) _buildWinOverlay(),
+                if (_provider.status == GameStatus.won) ...[
+                  const ConfettiOverlay(),
+                  _buildWinOverlay(),
+                ],
               ],
             ),
           ),

@@ -96,3 +96,32 @@ class AppTheme {
     return Theme.of(context).colorScheme.error;
   }
 }
+
+/// A sleek custom PageRouteBuilder that performs a smooth fade and slide transition.
+class FadePageRoute<T> extends PageRouteBuilder<T> {
+  final Widget child;
+
+  FadePageRoute({required this.child})
+    : super(
+        pageBuilder: (context, animation, secondaryAnimation) => child,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position:
+                  Tween<Offset>(
+                    begin: const Offset(0.04, 0.0),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      );
+}

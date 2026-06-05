@@ -127,6 +127,19 @@ class SettingsSheet extends StatelessWidget {
                   value: provider.endlessMode,
                   onChanged: (val) => provider.updateSettings(endlessMode: val),
                 ),
+                const SizedBox(height: 16),
+
+                // Switch 5: Auto-Remove Notes
+                _buildSettingTile(
+                  context,
+                  icon: Icons.auto_delete_rounded,
+                  title: 'Auto-Remove Notes',
+                  description:
+                      'Automatically remove a number from notes in same row/col/box when placed.',
+                  value: provider.autoRemoveNotes,
+                  onChanged: (val) =>
+                      provider.updateSettings(autoRemoveNotes: val),
+                ),
                 const SizedBox(height: 24),
               ],
             ),

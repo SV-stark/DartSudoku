@@ -20,12 +20,36 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late SudokuGameProvider _settingsProvider;
   bool _isTodayCompleted = false;
+  bool _hasSavedGame = false;
+  String _savedDifficulty = '';
+  int _savedElapsedTime = 0;
+  int _savedMistakes = 0;
 
   @override
   void initState() {
     super.initState();
     _settingsProvider = SudokuGameProvider();
     _checkTodayCompletion();
+    _checkSavedGame();
+  }
+
+  Future<void> _checkSavedGame() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasSaved = prefs.getBool('has_saved_game') ?? false;
+      if (hasSaved) {
+        setState(() {
+          _hasSavedGame = true;
+          _savedDifficulty = prefs.getString('saved_difficulty') ?? 'easy';
+          _savedElapsedTime = prefs.getInt('saved_elapsed_seconds') ?? 0;
+          _savedMistakes = prefs.getInt('saved_mistakes') ?? 0;
+        });
+      } else {
+        setState(() {
+          _hasSavedGame = false;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkTodayCompletion() async {
@@ -59,6 +83,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   // Header Logo Area
                   _buildLogo(context),
                   const SizedBox(height: 32),
+
+                  if (_hasSavedGame) ...[
+                    _buildContinueCard(context),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Daily Challenge Card
                   _buildDailyChallengeCard(context),
@@ -318,24 +347,30 @@ class _HomeScreenState extends State<HomeScreen> {
   void _startGame(String difficulty) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => GameScreen(difficulty: difficulty),
-      ),
-    );
+      FadePageRoute(child: GameScreen(difficulty: difficulty)),
+    ).then((_) => _checkSavedGame());
   }
 
   void _openSolver() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const SolverScreen()),
-    );
+    Navigator.push(context, FadePageRoute(child: const SolverScreen()));
   }
 
   void _openStats() {
+    Navigator.push(context, FadePageRoute(child: const StatsScreen()));
+  }
+
+  void _openDailyChallenge() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const StatsScreen()),
-    );
+      FadePageRoute(child: const DailyChallengeScreen()),
+    ).then((_) {
+      _checkTodayCompletion();
+      _checkSavedGame();
+    });
+  }
+
+  void _openTutorial() {
+    Navigator.push(context, FadePageRoute(child: const TutorialScreen()));
   }
 
   Widget _buildDailyChallengeCard(BuildContext context) {
@@ -458,17 +493,80 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openDailyChallenge() {
+  void _resumeSavedGame() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const DailyChallengeScreen()),
-    ).then((_) => _checkTodayCompletion());
+      FadePageRoute(
+        child: const GameScreen(difficulty: '', resumeSavedGame: true),
+      ),
+    ).then((_) => _checkSavedGame());
   }
 
-  void _openTutorial() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const TutorialScreen()),
+  Widget _buildContinueCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final minutes = _savedElapsedTime ~/ 60;
+    final seconds = _savedElapsedTime % 60;
+    final timeStr =
+        '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+
+    return Card(
+      elevation: 3,
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: _resumeSavedGame,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Icon(
+                Icons.play_circle_filled_rounded,
+                color: theme.colorScheme.onPrimaryContainer,
+                size: 44,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CONTINUE GAME',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_savedDifficulty.toUpperCase()} • Time: $timeStr • Mistakes: $_savedMistakes/3',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer.withValues(
+                          alpha: 0.85,
+                        ),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: theme.colorScheme.onPrimaryContainer,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

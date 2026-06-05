@@ -13,6 +13,8 @@ class SudokuGrid extends StatelessWidget {
   final bool highlightConflicts;
   final bool highlightIdentical;
   final bool showMistakes;
+  final int flashRow;
+  final int flashCol;
 
   const SudokuGrid({
     super.key,
@@ -26,6 +28,8 @@ class SudokuGrid extends StatelessWidget {
     this.highlightConflicts = true,
     this.highlightIdentical = true,
     this.showMistakes = true,
+    this.flashRow = -1,
+    this.flashCol = -1,
   });
 
   @override
@@ -86,7 +90,10 @@ class SudokuGrid extends StatelessWidget {
 
     // Colors mapping from M3 Theme
     Color cellBg = Colors.transparent;
-    if (isSelected) {
+    final bool isFlash = r == flashRow && c == flashCol;
+    if (isFlash) {
+      cellBg = Theme.of(context).colorScheme.tertiaryContainer;
+    } else if (isSelected) {
       cellBg = AppTheme.selectedCellBg(context);
     } else if (isSameNumber) {
       cellBg = AppTheme.sameNumberBg(context);
@@ -141,7 +148,8 @@ class SudokuGrid extends StatelessWidget {
     return GestureDetector(
       onTap: () => onCellTap(r, c),
       behavior: HitTestBehavior.opaque,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: cellBg,
           border: Border(bottom: bottomBorder, right: rightBorder),
@@ -157,7 +165,22 @@ class SudokuGrid extends StatelessWidget {
                 )
               : null,
           child: value != 0
-              ? Center(child: Text('$value', style: textStyle))
+              ? Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, animation) {
+                      return ScaleTransition(
+                        scale: animation,
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child: Text(
+                      '$value',
+                      key: ValueKey<int>(value),
+                      style: textStyle,
+                    ),
+                  ),
+                )
               : _buildNotes(context, r, c),
         ),
       ),

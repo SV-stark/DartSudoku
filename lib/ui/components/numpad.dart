@@ -7,20 +7,26 @@ class SudokuNumpad extends StatelessWidget {
 
   // Optional parameters for play mode controls
   final VoidCallback? onUndoTap;
+  final VoidCallback? onRedoTap;
   final VoidCallback? onNotesTap;
   final VoidCallback? onHintTap;
   final bool notesModeActive;
   final bool canUndo;
+  final bool canRedo;
+  final Map<int, int>? numberCounts;
 
   const SudokuNumpad({
     super.key,
     required this.onNumberTap,
     required this.onEraseTap,
     this.onUndoTap,
+    this.onRedoTap,
     this.onNotesTap,
     this.onHintTap,
     this.notesModeActive = false,
     this.canUndo = false,
+    this.canRedo = false,
+    this.numberCounts,
   });
 
   @override
@@ -51,6 +57,17 @@ class SudokuNumpad extends StatelessWidget {
             icon: Icons.undo_rounded,
             label: 'Undo',
             onTap: canUndo ? onUndoTap : null,
+            isActive: false,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+
+        // Redo Button
+        if (onRedoTap != null)
+          _buildToolButton(
+            context,
+            icon: Icons.redo_rounded,
+            label: 'Redo',
+            onTap: canRedo ? onRedoTap : null,
             isActive: false,
             color: Theme.of(context).colorScheme.primary,
           ),
@@ -162,24 +179,51 @@ class SudokuNumpad extends StatelessWidget {
       itemCount: 9,
       itemBuilder: (context, index) {
         final int number = index + 1;
+        final int remainingCount = numberCounts?[number] ?? 9;
+        final bool isCompleted = remainingCount == 0;
+
         return Card(
-          elevation: 1,
-          color: theme.colorScheme.surfaceContainerHighest,
+          elevation: isCompleted ? 0 : 1,
+          color: isCompleted
+              ? theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.35,
+                )
+              : theme.colorScheme.surfaceContainerHighest,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => onNumberTap(number),
-            child: Center(
-              child: Text(
-                '$number',
-                style: TextStyle(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$number',
+                  style: TextStyle(
+                    color: isCompleted
+                        ? theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.25,
+                          )
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  isCompleted ? '✓' : '$remainingCount',
+                  style: TextStyle(
+                    color: isCompleted
+                        ? Colors.green.withValues(alpha: 0.5)
+                        : theme.colorScheme.primary.withValues(alpha: 0.6),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+                ),
+              ],
             ),
           ),
         );
