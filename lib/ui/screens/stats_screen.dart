@@ -26,8 +26,9 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   String _formatTime(double totalSeconds) {
-    if (totalSeconds <= 0 || totalSeconds.isNaN || totalSeconds.isInfinite)
+    if (totalSeconds <= 0 || totalSeconds.isNaN || totalSeconds.isInfinite) {
       return '--:--';
+    }
     int secs = totalSeconds.round();
     int minutes = secs ~/ 60;
     int seconds = secs % 60;
@@ -57,7 +58,9 @@ class _StatsScreenState extends State<StatsScreen> {
           backgroundColor: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
+            side: BorderSide(
+              color: theme.colorScheme.error.withValues(alpha: 0.5),
+            ),
           ),
           title: Row(
             children: [
@@ -246,8 +249,8 @@ class _StatsScreenState extends State<StatsScreen> {
                     'CURRENT STREAK',
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurfaceVariant.withOpacity(
-                        0.7,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.7,
                       ),
                     ),
                   ),
@@ -279,8 +282,8 @@ class _StatsScreenState extends State<StatsScreen> {
                     'MAX WIN STREAK',
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurfaceVariant.withOpacity(
-                        0.7,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.7,
                       ),
                     ),
                   ),
@@ -362,7 +365,7 @@ class _StatsScreenState extends State<StatsScreen> {
         Text(
           label,
           style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
           ),
         ),
       ],

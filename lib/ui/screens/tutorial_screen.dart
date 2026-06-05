@@ -255,7 +255,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                           selectedRow: slide.highlightedRow,
                           selectedCol: slide.highlightedCol,
                           notes: gridNotes,
-                          onCellTap: (_, __) {}, // Read-only grid
+                          onCellTap: (r, c) {}, // Read-only grid
                         ),
                       ),
                     ),
@@ -331,7 +331,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
 
     return Card(
       elevation: 0,
-      color: theme.colorScheme.primaryContainer.withOpacity(0.15),
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.15),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Row(

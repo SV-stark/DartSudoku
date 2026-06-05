@@ -37,7 +37,7 @@ class AppTheme {
   // Common Text Styles utilizing context themes
   static TextStyle titleStyle(BuildContext context) {
     return TextStyle(
-      color: Theme.of(context).colorScheme.onBackground,
+      color: Theme.of(context).colorScheme.onSurface,
       fontSize: 28,
       fontWeight: FontWeight.bold,
       letterSpacing: 0.5,
@@ -61,15 +61,21 @@ class AppTheme {
 
   // Grid Cell Highlights using standard Material 3 Container Colors
   static Color selectedCellBg(BuildContext context) {
-    return Theme.of(context).colorScheme.primaryContainer.withOpacity(0.6);
+    return Theme.of(
+      context,
+    ).colorScheme.primaryContainer.withValues(alpha: 0.6);
   }
 
   static Color relatedCellBg(BuildContext context) {
-    return Theme.of(context).colorScheme.primaryContainer.withOpacity(0.15);
+    return Theme.of(
+      context,
+    ).colorScheme.primaryContainer.withValues(alpha: 0.15);
   }
 
   static Color sameNumberBg(BuildContext context) {
-    return Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.4);
+    return Theme.of(
+      context,
+    ).colorScheme.secondaryContainer.withValues(alpha: 0.4);
   }
 
   static Color clueText(BuildContext context) {
@@ -81,7 +87,9 @@ class AppTheme {
   }
 
   static Color noteText(BuildContext context) {
-    return Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7);
+    return Theme.of(
+      context,
+    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7);
   }
 
   static Color errorText(BuildContext context) {

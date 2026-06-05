@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'game_screen.dart';
-import '../theme.dart';
 
 /// Screen displaying a calendar grid of the current month where players can solve daily seeded games.
 class DailyChallengeScreen extends StatefulWidget {
@@ -81,7 +80,6 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final daysInMonth = DateUtils.getDaysInMonth(
       _selectedMonth.year,
       _selectedMonth.month,
@@ -167,7 +165,7 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
 
     return Card(
       elevation: 0,
-      color: theme.colorScheme.primaryContainer.withOpacity(0.15),
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.15),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
@@ -223,7 +221,7 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
             day,
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: theme.colorScheme.primary.withOpacity(0.8),
+              color: theme.colorScheme.primary.withValues(alpha: 0.8),
             ),
           ),
         ),
@@ -260,12 +258,14 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 color: isToday
-                    ? theme.colorScheme.primary.withOpacity(0.12)
-                    : theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                    : theme.colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.3,
+                      ),
                 border: Border.all(
                   color: isToday
                       ? theme.colorScheme.primary
-                      : diffColor.withOpacity(0.3),
+                      : diffColor.withValues(alpha: 0.3),
                   width: isToday ? 2.0 : 1.0,
                 ),
               ),

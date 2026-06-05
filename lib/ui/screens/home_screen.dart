@@ -136,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: theme.colorScheme.shadow.withOpacity(0.08),
+                color: theme.colorScheme.shadow.withValues(alpha: 0.08),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),
@@ -153,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
           style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.bold,
             letterSpacing: 1.0,
-            color: theme.colorScheme.onBackground,
+            color: theme.colorScheme.onSurface,
           ),
           textAlign: TextAlign.center,
         ),
@@ -297,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        side: BorderSide(color: color.withOpacity(0.5), width: 1.5),
+        side: BorderSide(color: color.withValues(alpha: 0.5), width: 1.5),
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -305,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
         label,
         style: TextStyle(
           color: theme.brightness == Brightness.dark
-              ? color.withOpacity(0.9)
+              ? color.withValues(alpha: 0.9)
               : color,
           fontSize: 16,
           fontWeight: FontWeight.bold,

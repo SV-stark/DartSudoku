@@ -262,8 +262,9 @@ class SudokuGameProvider extends ChangeNotifier {
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
     if (_currentBoard[_selectedRow][_selectedCol] == 0 &&
-        _notes[_selectedRow][_selectedCol].isEmpty)
+        _notes[_selectedRow][_selectedCol].isEmpty) {
       return;
+    }
 
     _saveToHistory();
     _currentBoard[_selectedRow][_selectedCol] = 0;

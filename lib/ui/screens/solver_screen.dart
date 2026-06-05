@@ -124,7 +124,9 @@ class _SolverScreenState extends State<SolverScreen> {
           backgroundColor: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.5)),
+            side: BorderSide(
+              color: theme.colorScheme.primary.withValues(alpha: 0.5),
+            ),
           ),
           title: Row(
             children: [
@@ -354,7 +356,7 @@ class _SolverScreenState extends State<SolverScreen> {
                 if (_provider.status == SolverStatus.solving)
                   Positioned.fill(
                     child: Container(
-                      color: Colors.black.withOpacity(0.5),
+                      color: Colors.black.withValues(alpha: 0.5),
                       child: Center(
                         child: Card(
                           elevation: 4,
@@ -448,7 +450,7 @@ class _SolverScreenState extends State<SolverScreen> {
       color: theme.colorScheme.errorContainer,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
+        side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),

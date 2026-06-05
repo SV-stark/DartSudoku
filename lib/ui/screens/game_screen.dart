@@ -224,7 +224,9 @@ class _GameScreenState extends State<GameScreen> {
           backgroundColor: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.5)),
+            side: BorderSide(
+              color: theme.colorScheme.primary.withValues(alpha: 0.5),
+            ),
           ),
           title: Row(
             children: [
@@ -264,7 +266,9 @@ class _GameScreenState extends State<GameScreen> {
               child: Text(
                 'KEEP THINKING',
                 style: TextStyle(
-                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.8,
+                  ),
                 ),
               ),
             ),
@@ -491,10 +495,10 @@ class _GameScreenState extends State<GameScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: difficultyColor.withOpacity(0.12),
+            color: difficultyColor.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: difficultyColor.withOpacity(0.5),
+              color: difficultyColor.withValues(alpha: 0.5),
               width: 1.0,
             ),
           ),
@@ -541,8 +545,9 @@ class _GameScreenState extends State<GameScreen> {
 
   Widget _buildStatsRow(Color difficultyColor) {
     final theme = Theme.of(context);
-    if (_provider.status == GameStatus.loading)
+    if (_provider.status == GameStatus.loading) {
       return const SizedBox(height: 20);
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -559,7 +564,7 @@ class _GameScreenState extends State<GameScreen> {
             Text(
               'Mistakes: ',
               style: TextStyle(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: 14,
               ),
             ),
@@ -571,7 +576,7 @@ class _GameScreenState extends State<GameScreen> {
                   Icons.favorite_rounded,
                   size: 16,
                   color: isMistake
-                      ? theme.colorScheme.error.withOpacity(0.15)
+                      ? theme.colorScheme.error.withValues(alpha: 0.15)
                       : theme.colorScheme.error,
                 ),
               );
@@ -629,7 +634,7 @@ class _GameScreenState extends State<GameScreen> {
 
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.55),
+        color: Colors.black.withValues(alpha: 0.55),
         child: Center(
           child: Card(
             elevation: 8,
@@ -682,7 +687,7 @@ class _GameScreenState extends State<GameScreen> {
 
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.65),
+        color: Colors.black.withValues(alpha: 0.65),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -758,7 +763,7 @@ class _GameScreenState extends State<GameScreen> {
 
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.65),
+        color: Colors.black.withValues(alpha: 0.65),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),

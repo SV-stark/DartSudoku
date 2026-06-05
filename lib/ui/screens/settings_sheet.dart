@@ -41,8 +41,8 @@ class SettingsSheet extends StatelessWidget {
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant.withOpacity(
-                        0.4,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.4,
                       ),
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -152,7 +152,7 @@ class SettingsSheet extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer.withOpacity(0.4),
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, size: 20, color: theme.colorScheme.primary),

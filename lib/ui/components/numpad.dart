@@ -102,13 +102,15 @@ class SudokuNumpad extends StatelessWidget {
     final Color buttonColor = isActive
         ? theme.colorScheme.primaryContainer
         : (onTap != null
-              ? color.withOpacity(0.12)
-              : theme.colorScheme.surfaceVariant.withOpacity(0.3));
+              ? color.withValues(alpha: 0.12)
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ));
     final Color iconColor = isActive
         ? theme.colorScheme.onPrimaryContainer
         : (onTap != null
               ? color
-              : theme.colorScheme.onSurface.withOpacity(0.3));
+              : theme.colorScheme.onSurface.withValues(alpha: 0.3));
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -137,7 +139,7 @@ class SudokuNumpad extends StatelessWidget {
           style: TextStyle(
             color: onTap != null
                 ? theme.colorScheme.onSurface
-                : theme.colorScheme.onSurface.withOpacity(0.35),
+                : theme.colorScheme.onSurface.withValues(alpha: 0.35),
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
@@ -162,7 +164,7 @@ class SudokuNumpad extends StatelessWidget {
         final int number = index + 1;
         return Card(
           elevation: 1,
-          color: theme.colorScheme.surfaceVariant,
+          color: theme.colorScheme.surfaceContainerHighest,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
