@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/sudoku_provider.dart';
 import '../../core/sudoku_analyzer.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
 import '../theme.dart';
+import 'settings_sheet.dart';
 
 /// The game screen where players solve generated boards.
 class GameScreen extends StatefulWidget {
   final String difficulty;
+  final String? dailyChallengeDate;
 
-  const GameScreen({super.key, required this.difficulty});
+  const GameScreen({
+    super.key,
+    required this.difficulty,
+    this.dailyChallengeDate,
+  });
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -27,15 +34,33 @@ class _GameScreenState extends State<GameScreen> {
     _provider.addListener(_onStateChange);
     _focusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _provider.newGame(widget.difficulty);
+      _provider.newGame(
+        widget.difficulty,
+        dailyDate: widget.dailyChallengeDate,
+      );
       _focusNode.requestFocus();
     });
   }
 
   void _onStateChange() {
     if (mounted) {
+      if (_provider.status == GameStatus.won &&
+          widget.dailyChallengeDate != null) {
+        _recordDailyChallengeSuccess();
+      }
       setState(() {});
     }
+  }
+
+  Future<void> _recordDailyChallengeSuccess() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('completed_daily_challenges') ?? [];
+      if (!list.contains(widget.dailyChallengeDate)) {
+        list.add(widget.dailyChallengeDate!);
+        await prefs.setStringList('completed_daily_challenges', list);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -289,6 +314,9 @@ class _GameScreenState extends State<GameScreen> {
                         isClue: _provider.isOriginalClue,
                         notes: _provider.notes,
                         solvedBoard: _provider.solvedBoard,
+                        highlightConflicts: _provider.highlightConflicts,
+                        highlightIdentical: _provider.highlightIdentical,
+                        showMistakes: _provider.showMistakes,
                         onCellTap: (r, c) {
                           _provider.selectCell(r, c);
                         },
@@ -354,6 +382,9 @@ class _GameScreenState extends State<GameScreen> {
                           isClue: _provider.isOriginalClue,
                           notes: _provider.notes,
                           solvedBoard: _provider.solvedBoard,
+                          highlightConflicts: _provider.highlightConflicts,
+                          highlightIdentical: _provider.highlightIdentical,
+                          showMistakes: _provider.showMistakes,
                           onCellTap: (r, c) {
                             _provider.selectCell(r, c);
                           },
@@ -424,7 +455,7 @@ class _GameScreenState extends State<GameScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Back Button & Theme Toggle group
+        // Back Button & Actions group
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -447,6 +478,12 @@ class _GameScreenState extends State<GameScreen> {
                 );
               },
             ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: () => SettingsSheet.show(context, _provider),
+              tooltip: 'Settings',
+              icon: const Icon(Icons.tune_rounded),
+            ),
           ],
         ),
 
@@ -462,7 +499,9 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ),
           child: Text(
-            _provider.difficulty.toUpperCase(),
+            widget.dailyChallengeDate != null
+                ? 'DAILY CHALLENGE'
+                : _provider.difficulty.toUpperCase(),
             style: TextStyle(
               color: difficultyColor,
               fontSize: 14,

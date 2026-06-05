@@ -10,6 +10,9 @@ class SudokuGrid extends StatelessWidget {
   final List<List<Set<int>>>? notes;
   final List<List<int>>? solvedBoard;
   final Function(int row, int col) onCellTap;
+  final bool highlightConflicts;
+  final bool highlightIdentical;
+  final bool showMistakes;
 
   const SudokuGrid({
     super.key,
@@ -20,6 +23,9 @@ class SudokuGrid extends StatelessWidget {
     this.isClue,
     this.notes,
     this.solvedBoard,
+    this.highlightConflicts = true,
+    this.highlightIdentical = true,
+    this.showMistakes = true,
   });
 
   @override
@@ -56,7 +62,10 @@ class SudokuGrid extends StatelessWidget {
 
     // Check relationship with selected cell
     bool isRelated = false;
-    if (selectedRow != -1 && selectedCol != -1 && !isSelected) {
+    if (highlightConflicts &&
+        selectedRow != -1 &&
+        selectedCol != -1 &&
+        !isSelected) {
       bool sameRow = r == selectedRow;
       bool sameCol = c == selectedCol;
       bool sameBox =
@@ -66,7 +75,11 @@ class SudokuGrid extends StatelessWidget {
 
     // Check matching digit
     bool isSameNumber = false;
-    if (selectedRow != -1 && selectedCol != -1 && !isSelected && value != 0) {
+    if (highlightIdentical &&
+        selectedRow != -1 &&
+        selectedCol != -1 &&
+        !isSelected &&
+        value != 0) {
       int selectedValue = board[selectedRow][selectedCol];
       isSameNumber = value == selectedValue;
     }
@@ -114,7 +127,7 @@ class SudokuGrid extends StatelessWidget {
         final bool isCorrect =
             solvedBoard == null || solvedBoard![r][c] == value;
         textStyle = TextStyle(
-          color: isCorrect
+          color: (isCorrect || !showMistakes)
               ? AppTheme.userText(context)
               : AppTheme.errorText(context),
           fontSize: 22,

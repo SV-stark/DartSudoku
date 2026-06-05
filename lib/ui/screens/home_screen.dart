@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../providers/sudoku_provider.dart';
 import '../theme.dart';
 import 'game_screen.dart';
 import 'solver_screen.dart';
 import 'stats_screen.dart';
+import 'daily_challenge_screen.dart';
+import 'tutorial_screen.dart';
+import 'settings_sheet.dart';
 
 /// The entry screen of the application offering play options and the solver utility.
 class HomeScreen extends StatefulWidget {
@@ -13,6 +18,29 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late SudokuGameProvider _settingsProvider;
+  bool _isTodayCompleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _settingsProvider = SudokuGameProvider();
+    _checkTodayCompletion();
+  }
+
+  Future<void> _checkTodayCompletion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('completed_daily_challenges') ?? [];
+      final today = DateTime.now();
+      final todayStr =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      setState(() {
+        _isTodayCompleted = list.contains(todayStr);
+      });
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,14 +58,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   // Header Logo Area
                   _buildLogo(context),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32),
+
+                  // Daily Challenge Card
+                  _buildDailyChallengeCard(context),
+                  const SizedBox(height: 16),
 
                   // Play Mode Card
                   _buildPlayCard(context),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // Solver Mode Card
                   _buildSolverCard(context),
+                  const SizedBox(height: 16),
+
+                  // Tutorial Card
+                  _buildTutorialCard(context),
                 ],
               ),
             ),
@@ -64,6 +100,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   },
+                ),
+                const SizedBox(width: 8),
+                FloatingActionButton.small(
+                  heroTag: 'settings_btn',
+                  onPressed: () =>
+                      SettingsSheet.show(context, _settingsProvider),
+                  tooltip: 'Settings',
+                  child: const Icon(Icons.tune_rounded),
                 ),
                 const SizedBox(width: 8),
                 FloatingActionButton.small(
@@ -291,6 +335,140 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const StatsScreen()),
+    );
+  }
+
+  Widget _buildDailyChallengeCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 2,
+      child: InkWell(
+        onTap: _openDailyChallenge,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Daily Challenge',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (_isTodayCompleted) ...[
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.star_rounded,
+                            color: Colors.amber,
+                            size: 18,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _isTodayCompleted
+                          ? "Congratulations! You completed today's seeded daily Sudoku challenge."
+                          : "Play today's seeded daily Sudoku and build your monthly completion streak.",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTutorialCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 2,
+      child: InkWell(
+        onTap: _openTutorial,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.school_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Sudoku School',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Learn scanning, pointing pairs, naked pairs, and advanced strategies with interactive visual guides.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openDailyChallenge() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const DailyChallengeScreen()),
+    ).then((_) => _checkTodayCompletion());
+  }
+
+  void _openTutorial() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TutorialScreen()),
     );
   }
 }

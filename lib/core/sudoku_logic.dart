@@ -145,13 +145,13 @@ class SudokuLogic {
   }
 
   /// Generates a fully solved Sudoku board.
-  static List<List<int>> generateSolvedBoard() {
+  static List<List<int>> generateSolvedBoard({Random? random}) {
     List<List<int>> board = List.generate(9, (_) => List.filled(9, 0));
-    _fillBoardRandomly(board);
+    _fillBoardRandomly(board, random: random);
     return board;
   }
 
-  static bool _fillBoardRandomly(List<List<int>> board) {
+  static bool _fillBoardRandomly(List<List<int>> board, {Random? random}) {
     int row = -1;
     int col = -1;
     bool isEmpty = false;
@@ -179,11 +179,11 @@ class SudokuLogic {
       return true;
     }
 
-    List<int> numbers = List.generate(9, (i) => i + 1)..shuffle();
+    List<int> numbers = List.generate(9, (i) => i + 1)..shuffle(random);
     for (int val in numbers) {
       if (isValid(board, row, col, val)) {
         board[row][col] = val;
-        if (_fillBoardRandomly(board)) return true;
+        if (_fillBoardRandomly(board, random: random)) return true;
         board[row][col] = 0;
       }
     }
@@ -193,7 +193,7 @@ class SudokuLogic {
 
   /// Generates a Sudoku game with a unique solution according to [difficulty].
   /// [difficulty] can be 'easy', 'medium', or 'hard'.
-  static SudokuPuzzle generatePuzzle(String difficulty) {
+  static SudokuPuzzle generatePuzzle(String difficulty, {Random? random}) {
     int cellsToRemove;
     switch (difficulty.toLowerCase()) {
       case 'easy':
@@ -214,7 +214,7 @@ class SudokuLogic {
 
     // Retry generation if a random removal sequence gets stuck before reaching target
     for (int attempt = 0; attempt < 5; attempt++) {
-      solved = generateSolvedBoard();
+      solved = generateSolvedBoard(random: random);
       puzzle = copyBoard(solved);
 
       // List of coordinates to try removing
@@ -224,7 +224,7 @@ class SudokuLogic {
           coordinates.add(Point(r, c));
         }
       }
-      coordinates.shuffle();
+      coordinates.shuffle(random);
 
       int removed = 0;
       for (var point in coordinates) {

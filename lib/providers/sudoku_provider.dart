@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/sudoku_logic.dart';
 import '../core/stats_manager.dart';
 
@@ -50,6 +52,16 @@ class SudokuGameProvider extends ChangeNotifier {
 
   final List<BoardState> _undoHistory = [];
 
+  // Settings properties
+  bool _showMistakes = true;
+  bool _highlightConflicts = true;
+  bool _highlightIdentical = true;
+  bool _endlessMode = false;
+
+  SudokuGameProvider() {
+    loadSettings();
+  }
+
   // Getters
   List<List<int>> get currentBoard => _currentBoard;
   List<List<int>> get solvedBoard => _solvedBoard;
@@ -65,6 +77,48 @@ class SudokuGameProvider extends ChangeNotifier {
   int get elapsedSeconds => _elapsedSeconds;
   bool get canUndo => _undoHistory.isNotEmpty;
 
+  bool get showMistakes => _showMistakes;
+  bool get highlightConflicts => _highlightConflicts;
+  bool get highlightIdentical => _highlightIdentical;
+  bool get endlessMode => _endlessMode;
+
+  Future<void> updateSettings({
+    bool? showMistakes,
+    bool? highlightConflicts,
+    bool? highlightIdentical,
+    bool? endlessMode,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (showMistakes != null) {
+      _showMistakes = showMistakes;
+      await prefs.setBool('show_mistakes', showMistakes);
+    }
+    if (highlightConflicts != null) {
+      _highlightConflicts = highlightConflicts;
+      await prefs.setBool('highlight_conflicts', highlightConflicts);
+    }
+    if (highlightIdentical != null) {
+      _highlightIdentical = highlightIdentical;
+      await prefs.setBool('highlight_identical', highlightIdentical);
+    }
+    if (endlessMode != null) {
+      _endlessMode = endlessMode;
+      await prefs.setBool('endless_mode', endlessMode);
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _showMistakes = prefs.getBool('show_mistakes') ?? true;
+      _highlightConflicts = prefs.getBool('highlight_conflicts') ?? true;
+      _highlightIdentical = prefs.getBool('highlight_identical') ?? true;
+      _endlessMode = prefs.getBool('endless_mode') ?? false;
+      notifyListeners();
+    } catch (_) {}
+  }
+
   String get formattedTime {
     int minutes = _elapsedSeconds ~/ 60;
     int seconds = _elapsedSeconds % 60;
@@ -78,13 +132,23 @@ class SudokuGameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Start a new game with [difficulty]
-  Future<void> newGame(String difficulty) async {
+  /// Start a new game with [difficulty], optionally seeded for a [dailyDate] challenge
+  Future<void> newGame(String difficulty, {String? dailyDate}) async {
     _status = GameStatus.loading;
     notifyListeners();
 
+    Random? random;
+    if (dailyDate != null) {
+      // Create a deterministic seed from the date string, e.g. "2026-06-05" -> 20260605
+      final cleanDate = dailyDate.replaceAll('-', '');
+      final seed = int.tryParse(cleanDate) ?? dailyDate.hashCode;
+      random = Random(seed);
+    }
+
     // Generate puzzle
-    final puzzle = await Future.value(SudokuLogic.generatePuzzle(difficulty));
+    final puzzle = await Future.value(
+      SudokuLogic.generatePuzzle(difficulty, random: random),
+    );
 
     _difficulty = difficulty;
     _currentBoard = SudokuLogic.copyBoard(puzzle.puzzleBoard);
@@ -104,7 +168,11 @@ class SudokuGameProvider extends ChangeNotifier {
 
     _status = GameStatus.playing;
     _startTimer();
-    StatsManager.recordGameStart(difficulty);
+
+    // Only record standard starts if not in daily challenge mode
+    if (dailyDate == null) {
+      StatsManager.recordGameStart(difficulty);
+    }
     notifyListeners();
   }
 
@@ -165,21 +233,24 @@ class SudokuGameProvider extends ChangeNotifier {
 
       // Check if the number is correct compared to solution
       if (number != _solvedBoard[_selectedRow][_selectedCol]) {
-        _mistakes++;
-        if (_mistakes >= maxMistakes) {
-          _status = GameStatus.gameOver;
-          _stopTimer();
-          StatsManager.recordGameLoss();
+        if (_showMistakes) {
+          _mistakes++;
+          if (!_endlessMode && _mistakes >= maxMistakes) {
+            _status = GameStatus.gameOver;
+            _stopTimer();
+            StatsManager.recordGameLoss();
+          }
         }
       } else {
         // Auto-clean notes for surrounding cells in same row, column, and box
         _cleanSurroundingNotes(_selectedRow, _selectedCol, number);
-        // Check for win
-        if (_checkWin()) {
-          _status = GameStatus.won;
-          _stopTimer();
-          StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
-        }
+      }
+
+      // Check for win
+      if (_checkWin()) {
+        _status = GameStatus.won;
+        _stopTimer();
+        StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
       }
     }
     notifyListeners();
