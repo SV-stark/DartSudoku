@@ -1,4 +1,4 @@
-name: Build & Release Windows App
+name: Build & Release App
 
 on:
   push:
@@ -10,8 +10,43 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build and Release Windows EXE Setup
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run Tests
+        run: flutter test
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-windows:
+    name: Build Windows EXE Setup
     runs-on: windows-latest
 
     steps:
@@ -34,24 +69,53 @@ jobs:
         run: flutter build windows --release
 
       - name: Package Windows Installer Setup (Inno Setup)
-        run: |
-          iscc setup.iss
+        run: iscc setup.iss
 
-      - name: Upload Installer Asset to Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload EXE Artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: build/windows/installer/DartSudokuSetup.exe
+          name: windows-exe
+          path: build/windows/installer/DartSudokuSetup.exe
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-android, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Android APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: release-artifacts
+
+      - name: Download Windows EXE Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+          path: release-artifacts
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/app-release.apk
+            release-artifacts/DartSudokuSetup.exe
           name: Release ${{ github.ref_name }}
           body: |
-            ## DartSudoku Setup Installer - Windows Release
+            ## DartSudoku Release - Version ${{ github.ref_name }}
             
             Welcome to the release of **DartSudoku**!
             
-            ### Installation Instructions
-            1. Download the `DartSudokuSetup.exe` file below.
+            ### 💻 Windows Installation
+            1. Download `DartSudokuSetup.exe` below.
             2. Run the installer and follow the prompt guidelines to install.
             3. Launch from your desktop shortcut!
+            
+            ### 📲 Android Installation
+            1. Download `app-release.apk` below.
+            2. Enable **Install from Unknown Sources** in your Android settings.
+            3. Open the downloaded APK to install.
           draft: false
           prerelease: false
         env:
