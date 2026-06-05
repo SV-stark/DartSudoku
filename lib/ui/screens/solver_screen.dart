@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../providers/sudoku_provider.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
+import '../theme.dart';
 
 /// The screen where users can enter custom Sudoku grids to get complete or cell-level solutions.
 class SolverScreen extends StatefulWidget {
@@ -13,12 +15,17 @@ class SolverScreen extends StatefulWidget {
 
 class _SolverScreenState extends State<SolverScreen> {
   late SudokuSolverProvider _provider;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
     _provider = SudokuSolverProvider();
     _provider.addListener(_onStateChange);
+    _focusNode = FocusNode();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
   }
 
   void _onStateChange() {
@@ -31,7 +38,80 @@ class _SolverScreenState extends State<SolverScreen> {
   void dispose() {
     _provider.removeListener(_onStateChange);
     _provider.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+
+    final key = event.logicalKey;
+
+    // Numbers 1-9
+    int? number;
+    if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
+      number = 1;
+    } else if (key == LogicalKeyboardKey.digit2 ||
+        key == LogicalKeyboardKey.numpad2) {
+      number = 2;
+    } else if (key == LogicalKeyboardKey.digit3 ||
+        key == LogicalKeyboardKey.numpad3) {
+      number = 3;
+    } else if (key == LogicalKeyboardKey.digit4 ||
+        key == LogicalKeyboardKey.numpad4) {
+      number = 4;
+    } else if (key == LogicalKeyboardKey.digit5 ||
+        key == LogicalKeyboardKey.numpad5) {
+      number = 5;
+    } else if (key == LogicalKeyboardKey.digit6 ||
+        key == LogicalKeyboardKey.numpad6) {
+      number = 6;
+    } else if (key == LogicalKeyboardKey.digit7 ||
+        key == LogicalKeyboardKey.numpad7) {
+      number = 7;
+    } else if (key == LogicalKeyboardKey.digit8 ||
+        key == LogicalKeyboardKey.numpad8) {
+      number = 8;
+    } else if (key == LogicalKeyboardKey.digit9 ||
+        key == LogicalKeyboardKey.numpad9) {
+      number = 9;
+    }
+
+    if (number != null) {
+      _provider.enterNumber(number);
+      return;
+    }
+
+    // Erase keys
+    if (key == LogicalKeyboardKey.backspace ||
+        key == LogicalKeyboardKey.delete) {
+      _provider.clearCell();
+      return;
+    }
+
+    // Arrow keys navigation
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight) {
+      int r = _provider.selectedRow;
+      int c = _provider.selectedCol;
+
+      if (r == -1 || c == -1) {
+        _provider.selectCell(0, 0);
+      } else {
+        if (key == LogicalKeyboardKey.arrowUp) {
+          r = (r - 1).clamp(0, 8);
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          r = (r + 1).clamp(0, 8);
+        } else if (key == LogicalKeyboardKey.arrowLeft) {
+          c = (c - 1).clamp(0, 8);
+        } else if (key == LogicalKeyboardKey.arrowRight) {
+          c = (c + 1).clamp(0, 8);
+        }
+        _provider.selectCell(r, c);
+      }
+    }
   }
 
   void _showHelpDialog() {
@@ -148,7 +228,8 @@ class _SolverScreenState extends State<SolverScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final size = MediaQuery.of(context).size;
+    final isLandscape = size.width > size.height;
 
     Widget content;
     if (isLandscape) {
@@ -177,7 +258,10 @@ class _SolverScreenState extends State<SolverScreen> {
             flex: 5,
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -250,45 +334,58 @@ class _SolverScreenState extends State<SolverScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: content,
-            ),
+        child: GestureDetector(
+          onTap: () {
+            _focusNode.requestFocus();
+          },
+          behavior: HitTestBehavior.opaque,
+          child: KeyboardListener(
+            focusNode: _focusNode,
+            autofocus: true,
+            onKeyEvent: _handleKeyEvent,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: content,
+                ),
 
-            // Processing/Solving Overlay loader (Clean Material 3 Card style)
-            if (_provider.status == SolverStatus.solving)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withOpacity(0.5),
-                  child: Center(
-                    child: Card(
-                      elevation: 4,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 40,
-                          vertical: 32,
-                        ),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CircularProgressIndicator(),
-                              SizedBox(height: 20),
-                              Text(
-                                'Solving Sudoku...',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                // Processing/Solving Overlay loader (Clean Material 3 Card style)
+                if (_provider.status == SolverStatus.solving)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black.withOpacity(0.5),
+                      child: Center(
+                        child: Card(
+                          elevation: 4,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 40,
+                              vertical: 32,
+                            ),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 20),
+                                  Text(
+                                    'Solving Sudoku...',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -300,10 +397,30 @@ class _SolverScreenState extends State<SolverScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Back Button
-        IconButton.filledTonal(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded),
+        // Back Button & Theme Toggle group
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton.filledTonal(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
+            const SizedBox(width: 8),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: AppTheme.themeModeNotifier,
+              builder: (context, themeMode, _) {
+                return IconButton.filledTonal(
+                  onPressed: AppTheme.toggleTheme,
+                  tooltip: 'Toggle Theme',
+                  icon: Icon(
+                    themeMode == ThemeMode.dark
+                        ? Icons.light_mode_rounded
+                        : Icons.dark_mode_rounded,
+                  ),
+                );
+              },
+            ),
+          ],
         ),
 
         // Title
@@ -360,7 +477,6 @@ class _SolverScreenState extends State<SolverScreen> {
   }
 
   Widget _buildSolverActionButtons() {
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [

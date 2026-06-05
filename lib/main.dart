@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppTheme.initTheme();
   runApp(const DartSudokuApp());
 }
 
@@ -12,19 +14,34 @@ class DartSudokuApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'DartSudoku',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppTheme.primarySeed,
-          brightness: Brightness.dark,
-        ),
-        fontFamily: 'Inter',
-      ),
-      home: const HomeScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.themeModeNotifier,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          title: 'DartSudoku',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeMode,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.light,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppTheme.primarySeed,
+              brightness: Brightness.light,
+            ),
+            fontFamily: 'Inter',
+          ),
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppTheme.primarySeed,
+              brightness: Brightness.dark,
+            ),
+            fontFamily: 'Inter',
+          ),
+          home: const HomeScreen(),
+        );
+      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme.dart';
 import 'game_screen.dart';
 import 'solver_screen.dart';
 import 'stats_screen.dart';
@@ -14,7 +15,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       body: Stack(
         children: [
@@ -43,14 +43,36 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Floating stats button in Material 3 style
+          // Floating action buttons in Material 3 style
           Positioned(
             top: 16,
             right: 16,
-            child: FloatingActionButton.small(
-              onPressed: _openStats,
-              tooltip: 'Analytics',
-              child: const Icon(Icons.insights_rounded),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ValueListenableBuilder<ThemeMode>(
+                  valueListenable: AppTheme.themeModeNotifier,
+                  builder: (context, themeMode, _) {
+                    return FloatingActionButton.small(
+                      heroTag: 'theme_toggle',
+                      onPressed: AppTheme.toggleTheme,
+                      tooltip: 'Toggle Theme',
+                      child: Icon(
+                        themeMode == ThemeMode.dark
+                            ? Icons.light_mode_rounded
+                            : Icons.dark_mode_rounded,
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                FloatingActionButton.small(
+                  heroTag: 'stats_btn',
+                  onPressed: _openStats,
+                  tooltip: 'Analytics',
+                  child: const Icon(Icons.insights_rounded),
+                ),
+              ],
             ),
           ),
         ],
@@ -63,10 +85,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Column(
       children: [
-        Icon(
-          Icons.grid_3x3_rounded,
-          size: 64,
-          color: theme.colorScheme.primary,
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withOpacity(0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+          ),
         ),
         const SizedBox(height: 16),
         Text(

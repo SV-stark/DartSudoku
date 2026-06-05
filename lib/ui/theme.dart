@@ -1,9 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Centralized Material 3 theme helpers and color mapping.
 class AppTheme {
   // Seed color used to generate the modern Material 3 color scheme
   static const Color primarySeed = Colors.indigo;
+
+  static final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(
+    ThemeMode.dark,
+  );
+
+  static const String _themeKey = 'sudoku_app_theme_mode';
+
+  /// Load theme preferences from SharedPreferences.
+  static Future<void> initTheme() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final modeIndex = prefs.getInt(_themeKey);
+      if (modeIndex != null) {
+        themeModeNotifier.value = ThemeMode.values[modeIndex];
+      }
+    } catch (_) {}
+  }
+
+  /// Toggle between Dark and Light themes and persist selection.
+  static Future<void> toggleTheme() async {
+    final current = themeModeNotifier.value;
+    final next = current == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    themeModeNotifier.value = next;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_themeKey, next.index);
+    } catch (_) {}
+  }
 
   // Common Text Styles utilizing context themes
   static TextStyle titleStyle(BuildContext context) {

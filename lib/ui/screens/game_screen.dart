@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../providers/sudoku_provider.dart';
 import '../../core/sudoku_analyzer.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
+import '../theme.dart';
 
 /// The game screen where players solve generated boards.
 class GameScreen extends StatefulWidget {
@@ -16,14 +18,17 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   late SudokuGameProvider _provider;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
     _provider = SudokuGameProvider();
     _provider.addListener(_onStateChange);
+    _focusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _provider.newGame(widget.difficulty);
+      _focusNode.requestFocus();
     });
   }
 
@@ -37,7 +42,96 @@ class _GameScreenState extends State<GameScreen> {
   void dispose() {
     _provider.removeListener(_onStateChange);
     _provider.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+
+    final key = event.logicalKey;
+
+    // Toggle notes mode with 'N'
+    if (key == LogicalKeyboardKey.keyN) {
+      _provider.toggleNotesMode();
+      return;
+    }
+
+    // Numbers 1-9
+    int? number;
+    if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
+      number = 1;
+    } else if (key == LogicalKeyboardKey.digit2 ||
+        key == LogicalKeyboardKey.numpad2) {
+      number = 2;
+    } else if (key == LogicalKeyboardKey.digit3 ||
+        key == LogicalKeyboardKey.numpad3) {
+      number = 3;
+    } else if (key == LogicalKeyboardKey.digit4 ||
+        key == LogicalKeyboardKey.numpad4) {
+      number = 4;
+    } else if (key == LogicalKeyboardKey.digit5 ||
+        key == LogicalKeyboardKey.numpad5) {
+      number = 5;
+    } else if (key == LogicalKeyboardKey.digit6 ||
+        key == LogicalKeyboardKey.numpad6) {
+      number = 6;
+    } else if (key == LogicalKeyboardKey.digit7 ||
+        key == LogicalKeyboardKey.numpad7) {
+      number = 7;
+    } else if (key == LogicalKeyboardKey.digit8 ||
+        key == LogicalKeyboardKey.numpad8) {
+      number = 8;
+    } else if (key == LogicalKeyboardKey.digit9 ||
+        key == LogicalKeyboardKey.numpad9) {
+      number = 9;
+    }
+
+    if (number != null) {
+      final isShiftActive = HardwareKeyboard.instance.isShiftPressed;
+      final isNotesMode = _provider.notesMode;
+
+      if (isShiftActive && !isNotesMode) {
+        // Temporarily act as notes mode
+        _provider.toggleNotesMode();
+        _provider.enterNumber(number);
+        _provider.toggleNotesMode();
+      } else {
+        _provider.enterNumber(number);
+      }
+      return;
+    }
+
+    // Erase keys
+    if (key == LogicalKeyboardKey.backspace ||
+        key == LogicalKeyboardKey.delete) {
+      _provider.eraseCell();
+      return;
+    }
+
+    // Arrow keys navigation
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight) {
+      int r = _provider.selectedRow;
+      int c = _provider.selectedCol;
+
+      if (r == -1 || c == -1) {
+        _provider.selectCell(0, 0);
+      } else {
+        if (key == LogicalKeyboardKey.arrowUp) {
+          r = (r - 1).clamp(0, 8);
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          r = (r + 1).clamp(0, 8);
+        } else if (key == LogicalKeyboardKey.arrowLeft) {
+          c = (c - 1).clamp(0, 8);
+        } else if (key == LogicalKeyboardKey.arrowRight) {
+          c = (c + 1).clamp(0, 8);
+        }
+        _provider.selectCell(r, c);
+      }
+    }
   }
 
   Color _getDifficultyColor(String diff) {
@@ -172,7 +266,8 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     final gameColor = _getDifficultyColor(_provider.difficulty);
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final size = MediaQuery.of(context).size;
+    final isLandscape = size.width > size.height;
 
     Widget content;
     if (isLandscape) {
@@ -206,7 +301,10 @@ class _GameScreenState extends State<GameScreen> {
             flex: 5,
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -285,24 +383,36 @@ class _GameScreenState extends State<GameScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Stack(
-          children: [
-            // Core Layout
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: content,
+        child: GestureDetector(
+          onTap: () {
+            _focusNode.requestFocus();
+          },
+          behavior: HitTestBehavior.opaque,
+          child: KeyboardListener(
+            focusNode: _focusNode,
+            autofocus: true,
+            onKeyEvent: _handleKeyEvent,
+            child: Stack(
+              children: [
+                // Core Layout
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: content,
+                ),
+
+                // Game Pause Overlay
+                if (_provider.status == GameStatus.paused)
+                  _buildPausedOverlay(),
+
+                // Game Over Overlay
+                if (_provider.status == GameStatus.gameOver)
+                  _buildGameOverOverlay(),
+
+                // Win Overlay
+                if (_provider.status == GameStatus.won) _buildWinOverlay(),
+              ],
             ),
-
-            // Game Pause Overlay
-            if (_provider.status == GameStatus.paused) _buildPausedOverlay(),
-
-            // Game Over Overlay
-            if (_provider.status == GameStatus.gameOver)
-              _buildGameOverOverlay(),
-
-            // Win Overlay
-            if (_provider.status == GameStatus.won) _buildWinOverlay(),
-          ],
+          ),
         ),
       ),
     );
@@ -314,10 +424,30 @@ class _GameScreenState extends State<GameScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Back Button
-        IconButton.filledTonal(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded),
+        // Back Button & Theme Toggle group
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton.filledTonal(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
+            const SizedBox(width: 8),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: AppTheme.themeModeNotifier,
+              builder: (context, themeMode, _) {
+                return IconButton.filledTonal(
+                  onPressed: AppTheme.toggleTheme,
+                  tooltip: 'Toggle Theme',
+                  icon: Icon(
+                    themeMode == ThemeMode.dark
+                        ? Icons.light_mode_rounded
+                        : Icons.dark_mode_rounded,
+                  ),
+                );
+              },
+            ),
+          ],
         ),
 
         // Difficulty Badge (FilterChip-like styling)

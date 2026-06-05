@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/stats_manager.dart';
+import '../theme.dart';
 
 /// Screen displaying game analytics, win ratios, streaks, and speed scores.
 class StatsScreen extends StatefulWidget {
@@ -70,7 +71,6 @@ class _StatsScreenState extends State<StatsScreen> {
           ),
           content: const Text(
             'Are you sure you want to permanently clear all DartSudoku statistics, records, and win streaks? This action cannot be undone.',
-            style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
@@ -175,9 +175,29 @@ class _StatsScreenState extends State<StatsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton.filledTonal(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_rounded),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton.filledTonal(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back_rounded),
+              ),
+              const SizedBox(width: 8),
+              ValueListenableBuilder<ThemeMode>(
+                valueListenable: AppTheme.themeModeNotifier,
+                builder: (context, themeMode, _) {
+                  return IconButton.filledTonal(
+                    onPressed: AppTheme.toggleTheme,
+                    tooltip: 'Toggle Theme',
+                    icon: Icon(
+                      themeMode == ThemeMode.dark
+                          ? Icons.light_mode_rounded
+                          : Icons.dark_mode_rounded,
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           Text(
             'DartSudoku Analytics',
