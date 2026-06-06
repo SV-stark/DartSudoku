@@ -6,6 +6,20 @@ An elegant, modern Sudoku game and solver built with Flutter. DartSudoku impleme
 
 ## ✨ Features
 
+### 🎓 Sudoku School (Syllabus, Lessons & Active Practice)
+- **Structured Curriculum**: A learning pathway consisting of 45 advanced solving strategies organized into 4 progressive difficulty tiers:
+  - **Tier 1: Basics & Scanning** (e.g., Naked/Hidden Singles, Pairs, Triples, Quads, Locked Candidates)
+  - **Tier 2: Advanced Fish** (e.g., X-Wing, Swordfish, Jellyfish, Finned/Sashimi variants)
+  - **Tier 3: Wing Strategies** (e.g., Skyscraper, Two-String-Kite, Crane, Empty Rectangle, Y-Wing, XYZ-Wing, W-Wing)
+  - **Tier 4: Chaining & Uniqueness** (e.g., Simple Coloring, X-Chain, XY-Chain, AIC, Forcing Chains, Unique Rectangles, BUG)
+- **Interactive Autoplay Lessons**: Slide decks with autoplay controls (play/pause) that advance step-by-step, automatically pausing to wait for user interaction at key solving check-points.
+- **Active Mastery Practice**:
+  - **Realistic Board Generation**: Generates strategy-specific puzzles with ~35% pre-filled clues instead of blank cells, recreating authentic gameplay conditions.
+  - **Guided Path/Link Tracing**: Traces conjugate chains and loops sequentially in order (supporting both forward and backward tracing, plus backtracking/untapping) to lock in recognition of advanced wing/chain techniques.
+  - **Global Candidate Filtering**: Digit filter bar (1-9) that dims non-matching candidate notes, helping isolate and visualize complex patterns.
+- **Time Attack Blitz Lobby**: A timed 3-minute recognition game mode designed to test recognition speed. Correct solves add points, while mistakes apply a 15-second time penalty.
+- **School Analytics Dashboard**: A comprehensive statistics sheet tracking total mistakes, tier progress bars, average pattern recognition speed, and personalized training tips.
+
 ### 🎮 Play Mode
 - **Three Levels of Difficulty**:
   - **Easy**: 32 starting clues.
