@@ -151,11 +151,14 @@ void main() {
 
     // Tap start button
     await tester.tap(find.text('START BLITZ CHALLENGE'));
-    await tester.pumpAndSettle();
+    await tester.pump(); // Use pump to render first frame without waiting for periodic timer indefinitely
 
     // Verify game screen components are shown
     expect(find.textContaining('Score: 0'), findsOneWidget);
     expect(find.textContaining('Current Strategy:'), findsOneWidget);
+
+    // Clean up/cancel the periodic timer by disposing the widget tree
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('TutorialScreen candidate filter chip toggles selected state', (
@@ -226,6 +229,9 @@ void main() {
       ),
       findsOneWidget,
     );
+
+    // Clean up/cancel any pending timers or snackbars by disposing the widget tree
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets(
