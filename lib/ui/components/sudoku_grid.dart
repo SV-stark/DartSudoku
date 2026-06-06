@@ -16,6 +16,7 @@ class SudokuGrid extends StatelessWidget {
   final int flashRow;
   final int flashCol;
   final Map<String, Color>? customCellBgs;
+  final int candidateFilter;
 
   const SudokuGrid({
     super.key,
@@ -32,6 +33,7 @@ class SudokuGrid extends StatelessWidget {
     this.flashRow = -1,
     this.flashCol = -1,
     this.customCellBgs,
+    this.candidateFilter = -1,
   });
 
   @override
@@ -93,7 +95,11 @@ class SudokuGrid extends StatelessWidget {
     // Colors mapping from M3 Theme
     Color cellBg = Colors.transparent;
     final bool isFlash = r == flashRow && c == flashCol;
-    if (customCellBgs != null && customCellBgs!.containsKey('$r,$c')) {
+    if (candidateFilter != -1 && value == candidateFilter) {
+      cellBg = Theme.of(
+        context,
+      ).colorScheme.primaryContainer.withValues(alpha: 0.65);
+    } else if (customCellBgs != null && customCellBgs!.containsKey('$r,$c')) {
       cellBg = customCellBgs!['$r,$c']!;
     } else if (isFlash) {
       cellBg = Theme.of(context).colorScheme.tertiaryContainer;
@@ -145,11 +151,18 @@ class SudokuGrid extends StatelessWidget {
           fontWeight: FontWeight.bold,
         );
       }
+
+      if (candidateFilter != -1 && value != candidateFilter) {
+        textStyle = textStyle.copyWith(
+          color: textStyle.color?.withValues(alpha: 0.15),
+        );
+      }
     } else {
       textStyle = const TextStyle(color: Colors.transparent);
     }
 
     return GestureDetector(
+      key: Key('cell_${r}_${c}'),
       onTap: () => onCellTap(r, c),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
@@ -207,14 +220,29 @@ class SudokuGrid extends StatelessWidget {
               children: List.generate(3, (gridC) {
                 int noteNum = gridR * 3 + gridC + 1;
                 bool hasNote = cellNotes.contains(noteNum);
+
+                Color noteColor = AppTheme.noteText(context);
+                double fontSize = 9;
+                FontWeight weight = FontWeight.bold;
+
+                if (candidateFilter != -1) {
+                  if (noteNum == candidateFilter) {
+                    noteColor = Colors.orange.shade800;
+                    fontSize = 11;
+                    weight = FontWeight.w900;
+                  } else {
+                    noteColor = noteColor.withValues(alpha: 0.15);
+                  }
+                }
+
                 return Expanded(
                   child: Center(
                     child: Text(
                       hasNote ? '$noteNum' : '',
                       style: TextStyle(
-                        fontSize: 9,
-                        color: AppTheme.noteText(context),
-                        fontWeight: FontWeight.bold,
+                        fontSize: fontSize,
+                        color: noteColor,
+                        fontWeight: weight,
                       ),
                     ),
                   ),
