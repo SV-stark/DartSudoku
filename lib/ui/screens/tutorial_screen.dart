@@ -202,7 +202,10 @@ class _TutorialScreenState extends State<TutorialScreen>
 
     // 2. Generate the permuted solved reference grid
     final permutedSolvedRef = List.generate(9, (r) {
-      return List.generate(9, (c) => perm[solvedRef[r][c]]!);
+      return List.generate(9, (c) {
+        final val = solvedRef[r][c];
+        return val == 0 ? 0 : perm[val]!;
+      });
     });
 
     // 3. Define pattern cells to know what cells are untouchable
