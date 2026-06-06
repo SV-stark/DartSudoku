@@ -39,6 +39,17 @@ class DartSudokuApp extends StatelessWidget {
             ),
             fontFamily: 'Inter',
           ),
+          builder: (context, child) {
+            final mediaQueryData = MediaQuery.of(context);
+            final clampedTextScaler = mediaQueryData.textScaler.clamp(
+              minScaleFactor: 0.8,
+              maxScaleFactor: 1.25,
+            );
+            return MediaQuery(
+              data: mediaQueryData.copyWith(textScaler: clampedTextScaler),
+              child: child!,
+            );
+          },
           home: const HomeScreen(),
         );
       },

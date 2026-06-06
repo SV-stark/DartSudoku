@@ -244,12 +244,20 @@ class _SolverScreenState extends State<SolverScreen> {
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: SudokuGrid(
-                  board: _provider.solverBoard,
-                  selectedRow: _provider.selectedRow,
-                  selectedCol: _provider.selectedCol,
-                  onCellTap: (r, c) {
-                    _provider.selectCell(r, c);
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([
+                    _provider,
+                    _provider.selectionNotifier,
+                  ]),
+                  builder: (context, _) {
+                    return SudokuGrid(
+                      board: _provider.solverBoard,
+                      selectedRow: _provider.selectedRow,
+                      selectedCol: _provider.selectedCol,
+                      onCellTap: (r, c) {
+                        _provider.selectCell(r, c);
+                      },
+                    );
                   },
                 ),
               ),
@@ -299,12 +307,20 @@ class _SolverScreenState extends State<SolverScreen> {
               // Grid Screen
               Expanded(
                 child: Center(
-                  child: SudokuGrid(
-                    board: _provider.solverBoard,
-                    selectedRow: _provider.selectedRow,
-                    selectedCol: _provider.selectedCol,
-                    onCellTap: (r, c) {
-                      _provider.selectCell(r, c);
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([
+                      _provider,
+                      _provider.selectionNotifier,
+                    ]),
+                    builder: (context, _) {
+                      return SudokuGrid(
+                        board: _provider.solverBoard,
+                        selectedRow: _provider.selectedRow,
+                        selectedCol: _provider.selectedCol,
+                        onCellTap: (r, c) {
+                          _provider.selectCell(r, c);
+                        },
+                      );
                     },
                   ),
                 ),

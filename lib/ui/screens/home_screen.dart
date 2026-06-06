@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../data/prefs_keys.dart';
 import '../../providers/sudoku_provider.dart';
 import '../theme.dart';
 import 'game_screen.dart';
@@ -36,13 +37,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkSavedGame() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final hasSaved = prefs.getBool('has_saved_game') ?? false;
+      final hasSaved = prefs.getBool(PrefsKeys.hasSavedGame) ?? false;
       if (hasSaved) {
         setState(() {
           _hasSavedGame = true;
-          _savedDifficulty = prefs.getString('saved_difficulty') ?? 'easy';
-          _savedElapsedTime = prefs.getInt('saved_elapsed_seconds') ?? 0;
-          _savedMistakes = prefs.getInt('saved_mistakes') ?? 0;
+          _savedDifficulty = prefs.getString(PrefsKeys.savedDifficulty) ?? 'easy';
+          _savedElapsedTime = prefs.getInt(PrefsKeys.savedElapsedSeconds) ?? 0;
+          _savedMistakes = prefs.getInt(PrefsKeys.savedMistakes) ?? 0;
         });
       } else {
         setState(() {
@@ -55,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkTodayCompletion() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList('completed_daily_challenges') ?? [];
+      final list = prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
       final today = DateTime.now();
       final todayStr =
           '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';

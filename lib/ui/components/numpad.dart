@@ -132,22 +132,28 @@ class SudokuNumpad extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: buttonColor,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isActive
-                    ? theme.colorScheme.primary
-                    : Colors.transparent,
-                width: 1.5,
+        Semantics(
+          label: label,
+          button: true,
+          enabled: onTap != null,
+          selected: isActive,
+          child: GestureDetector(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: buttonColor,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isActive
+                      ? theme.colorScheme.primary
+                      : Colors.transparent,
+                  width: 1.5,
+                ),
               ),
+              child: Icon(icon, size: 24, color: iconColor),
             ),
-            child: Icon(icon, size: 24, color: iconColor),
           ),
         ),
         const SizedBox(height: 6),
@@ -193,37 +199,41 @@ class SudokuNumpad extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => onNumberTap(number),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '$number',
-                  style: TextStyle(
-                    color: isCompleted
-                        ? theme.colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.25,
-                          )
-                        : theme.colorScheme.onSurfaceVariant,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    height: 1.1,
+          child: Semantics(
+            label: 'Number $number, ${isCompleted ? "completed" : "$remainingCount remaining"}',
+            button: true,
+            child: InkWell(
+              onTap: () => onNumberTap(number),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '$number',
+                    style: TextStyle(
+                      color: isCompleted
+                          ? theme.colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.25,
+                            )
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isCompleted ? '✓' : '$remainingCount',
-                  style: TextStyle(
-                    color: isCompleted
-                        ? Colors.green.withValues(alpha: 0.5)
-                        : theme.colorScheme.primary.withValues(alpha: 0.6),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    height: 1.0,
+                  const SizedBox(height: 2),
+                  Text(
+                    isCompleted ? '✓' : '$remainingCount',
+                    style: TextStyle(
+                      color: isCompleted
+                          ? Colors.green.withValues(alpha: 0.5)
+                          : theme.colorScheme.primary.withValues(alpha: 0.6),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      height: 1.0,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../data/prefs_keys.dart';
 import '../theme.dart';
 import 'game_screen.dart';
 
@@ -29,7 +30,7 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
     });
     try {
       final prefs = await SharedPreferences.getInstance();
-      _completedDates = prefs.getStringList('completed_daily_challenges') ?? [];
+      _completedDates = prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
     } catch (_) {}
     if (mounted) {
       setState(() {

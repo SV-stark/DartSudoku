@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/sudoku_logic.dart';
 import '../core/stats_manager.dart';
+import '../data/prefs_keys.dart';
 
 /// Represents a snapshot of the board state for undo functionality.
 class BoardState {
@@ -28,6 +29,9 @@ enum GameStatus { idle, loading, playing, paused, won, gameOver }
 
 /// Manages the state of the active play game.
 class SudokuGameProvider extends ChangeNotifier {
+  final ChangeNotifier selectionNotifier = ChangeNotifier();
+  final ChangeNotifier timerNotifier = ChangeNotifier();
+
   List<List<int>> _currentBoard = List.generate(9, (_) => List.filled(9, 0));
   List<List<int>> _solvedBoard = List.generate(9, (_) => List.filled(9, 0));
   List<List<bool>> _isOriginalClue = List.generate(
@@ -123,23 +127,23 @@ class SudokuGameProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     if (showMistakes != null) {
       _showMistakes = showMistakes;
-      await prefs.setBool('show_mistakes', showMistakes);
+      await prefs.setBool(PrefsKeys.showMistakes, showMistakes);
     }
     if (highlightConflicts != null) {
       _highlightConflicts = highlightConflicts;
-      await prefs.setBool('highlight_conflicts', highlightConflicts);
+      await prefs.setBool(PrefsKeys.highlightConflicts, highlightConflicts);
     }
     if (highlightIdentical != null) {
       _highlightIdentical = highlightIdentical;
-      await prefs.setBool('highlight_identical', highlightIdentical);
+      await prefs.setBool(PrefsKeys.highlightIdentical, highlightIdentical);
     }
     if (endlessMode != null) {
       _endlessMode = endlessMode;
-      await prefs.setBool('endless_mode', endlessMode);
+      await prefs.setBool(PrefsKeys.endlessMode, endlessMode);
     }
     if (autoRemoveNotes != null) {
       _autoRemoveNotes = autoRemoveNotes;
-      await prefs.setBool('auto_remove_notes', autoRemoveNotes);
+      await prefs.setBool(PrefsKeys.autoRemoveNotes, autoRemoveNotes);
     }
     notifyListeners();
   }
@@ -147,11 +151,11 @@ class SudokuGameProvider extends ChangeNotifier {
   Future<void> loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _showMistakes = prefs.getBool('show_mistakes') ?? true;
-      _highlightConflicts = prefs.getBool('highlight_conflicts') ?? true;
-      _highlightIdentical = prefs.getBool('highlight_identical') ?? true;
-      _endlessMode = prefs.getBool('endless_mode') ?? false;
-      _autoRemoveNotes = prefs.getBool('auto_remove_notes') ?? true;
+      _showMistakes = prefs.getBool(PrefsKeys.showMistakes) ?? true;
+      _highlightConflicts = prefs.getBool(PrefsKeys.highlightConflicts) ?? true;
+      _highlightIdentical = prefs.getBool(PrefsKeys.highlightIdentical) ?? true;
+      _endlessMode = prefs.getBool(PrefsKeys.endlessMode) ?? false;
+      _autoRemoveNotes = prefs.getBool(PrefsKeys.autoRemoveNotes) ?? true;
       notifyListeners();
     } catch (_) {}
   }
@@ -166,7 +170,7 @@ class SudokuGameProvider extends ChangeNotifier {
     if (_status != GameStatus.playing) return;
     _selectedRow = r;
     _selectedCol = c;
-    notifyListeners();
+    selectionNotifier.notifyListeners();
   }
 
   /// Start a new game with [difficulty], optionally seeded for a [dailyDate] challenge
@@ -461,7 +465,7 @@ class SudokuGameProvider extends ChangeNotifier {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _elapsedSeconds++;
-      notifyListeners();
+      timerNotifier.notifyListeners();
       _saveGameState();
     });
   }
@@ -474,6 +478,8 @@ class SudokuGameProvider extends ChangeNotifier {
   @override
   void dispose() {
     _stopTimer();
+    selectionNotifier.dispose();
+    timerNotifier.dispose();
     super.dispose();
   }
 
@@ -483,16 +489,16 @@ class SudokuGameProvider extends ChangeNotifier {
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('saved_difficulty', _difficulty);
+      await prefs.setString(PrefsKeys.savedDifficulty, _difficulty);
       if (_dailyChallengeDate != null) {
-        await prefs.setString('saved_daily_date', _dailyChallengeDate!);
+        await prefs.setString(PrefsKeys.savedDailyDate, _dailyChallengeDate!);
       } else {
-        await prefs.remove('saved_daily_date');
+        await prefs.remove(PrefsKeys.savedDailyDate);
       }
-      await prefs.setString('saved_current_board', jsonEncode(_currentBoard));
-      await prefs.setString('saved_solved_board', jsonEncode(_solvedBoard));
+      await prefs.setString(PrefsKeys.savedCurrentBoard, jsonEncode(_currentBoard));
+      await prefs.setString(PrefsKeys.savedSolvedBoard, jsonEncode(_solvedBoard));
       await prefs.setString(
-        'saved_is_original_clue',
+        PrefsKeys.savedIsOriginalClue,
         jsonEncode(_isOriginalClue),
       );
 
@@ -500,25 +506,25 @@ class SudokuGameProvider extends ChangeNotifier {
         9,
         (r) => List.generate(9, (c) => _notes[r][c].toList()),
       );
-      await prefs.setString('saved_notes', jsonEncode(notesList));
-      await prefs.setInt('saved_mistakes', _mistakes);
-      await prefs.setInt('saved_elapsed_seconds', _elapsedSeconds);
-      await prefs.setBool('has_saved_game', true);
+      await prefs.setString(PrefsKeys.savedNotes, jsonEncode(notesList));
+      await prefs.setInt(PrefsKeys.savedMistakes, _mistakes);
+      await prefs.setInt(PrefsKeys.savedElapsedSeconds, _elapsedSeconds);
+      await prefs.setBool(PrefsKeys.hasSavedGame, true);
     } catch (_) {}
   }
 
   Future<void> _clearSavedGame() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('saved_difficulty');
-      await prefs.remove('saved_daily_date');
-      await prefs.remove('saved_current_board');
-      await prefs.remove('saved_solved_board');
-      await prefs.remove('saved_is_original_clue');
-      await prefs.remove('saved_notes');
-      await prefs.remove('saved_mistakes');
-      await prefs.remove('saved_elapsed_seconds');
-      await prefs.setBool('has_saved_game', false);
+      await prefs.remove(PrefsKeys.savedDifficulty);
+      await prefs.remove(PrefsKeys.savedDailyDate);
+      await prefs.remove(PrefsKeys.savedCurrentBoard);
+      await prefs.remove(PrefsKeys.savedSolvedBoard);
+      await prefs.remove(PrefsKeys.savedIsOriginalClue);
+      await prefs.remove(PrefsKeys.savedNotes);
+      await prefs.remove(PrefsKeys.savedMistakes);
+      await prefs.remove(PrefsKeys.savedElapsedSeconds);
+      await prefs.setBool(PrefsKeys.hasSavedGame, false);
     } catch (_) {}
   }
 
@@ -528,16 +534,16 @@ class SudokuGameProvider extends ChangeNotifier {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      _difficulty = prefs.getString('saved_difficulty') ?? 'easy';
-      final dailyDate = prefs.getString('saved_daily_date');
+      _difficulty = prefs.getString(PrefsKeys.savedDifficulty) ?? 'easy';
+      final dailyDate = prefs.getString(PrefsKeys.savedDailyDate);
       _dailyChallengeDate = (dailyDate == null || dailyDate.isEmpty)
           ? null
           : dailyDate;
 
-      final currentBoardStr = prefs.getString('saved_current_board') ?? '';
-      final solvedBoardStr = prefs.getString('saved_solved_board') ?? '';
-      final originalClueStr = prefs.getString('saved_is_original_clue') ?? '';
-      final notesStr = prefs.getString('saved_notes') ?? '';
+      final currentBoardStr = prefs.getString(PrefsKeys.savedCurrentBoard) ?? '';
+      final solvedBoardStr = prefs.getString(PrefsKeys.savedSolvedBoard) ?? '';
+      final originalClueStr = prefs.getString(PrefsKeys.savedIsOriginalClue) ?? '';
+      final notesStr = prefs.getString(PrefsKeys.savedNotes) ?? '';
 
       final dynamic currentBoardJson = jsonDecode(currentBoardStr);
       _currentBoard = List.generate(
@@ -563,8 +569,8 @@ class SudokuGameProvider extends ChangeNotifier {
         (r) => List.generate(9, (c) => Set<int>.from(notesJson[r][c])),
       );
 
-      _mistakes = prefs.getInt('saved_mistakes') ?? 0;
-      _elapsedSeconds = prefs.getInt('saved_elapsed_seconds') ?? 0;
+      _mistakes = prefs.getInt(PrefsKeys.savedMistakes) ?? 0;
+      _elapsedSeconds = prefs.getInt(PrefsKeys.savedElapsedSeconds) ?? 0;
 
       _selectedRow = -1;
       _selectedCol = -1;
@@ -586,6 +592,8 @@ enum SolverStatus { idle, solving, solved, error }
 
 /// Manages the state of the custom puzzle solver interface.
 class SudokuSolverProvider extends ChangeNotifier {
+  final ChangeNotifier selectionNotifier = ChangeNotifier();
+
   List<List<int>> _solverBoard = List.generate(9, (_) => List.filled(9, 0));
   int _selectedRow = -1;
   int _selectedCol = -1;
@@ -601,8 +609,12 @@ class SudokuSolverProvider extends ChangeNotifier {
   void selectCell(int r, int c) {
     _selectedRow = r;
     _selectedCol = c;
-    _errorMessage = null;
-    notifyListeners();
+    if (_errorMessage != null) {
+      _errorMessage = null;
+      notifyListeners();
+    } else {
+      selectionNotifier.notifyListeners();
+    }
   }
 
   void enterNumber(int number) {
@@ -703,5 +715,11 @@ class SudokuSolverProvider extends ChangeNotifier {
           "This Sudoku layout is unsolvable. Cannot solve the selected cell.";
     }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    selectionNotifier.dispose();
+    super.dispose();
   }
 }

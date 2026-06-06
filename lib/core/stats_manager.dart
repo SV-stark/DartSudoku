@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/prefs_keys.dart';
 
 /// Represents a single best time record with a date.
 class TimeRecord {
@@ -116,7 +117,7 @@ class GameStats {
 
 /// Helper class to load/save stats in persistent storage.
 class StatsManager {
-  static const String _key = 'sudoku_nexus_stats';
+  static const String _key = PrefsKeys.stats;
 
   /// Load all game stats from SharedPreferences
   static Future<GameStats> getStats() async {

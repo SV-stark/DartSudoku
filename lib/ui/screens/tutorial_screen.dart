@@ -109,6 +109,7 @@ class _TutorialScreenState extends State<TutorialScreen>
   void dispose() {
     _shakeController.dispose();
     _timeAttackTimer?.cancel();
+    _lessonPlayTimer?.cancel();
     super.dispose();
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/prefs_keys.dart';
 
 /// Centralized Material 3 theme helpers and color mapping.
 class AppTheme {
@@ -10,7 +11,7 @@ class AppTheme {
     ThemeMode.dark,
   );
 
-  static const String _themeKey = 'sudoku_app_theme_mode';
+  static const String _themeKey = PrefsKeys.themeMode;
 
   /// Load theme preferences from SharedPreferences.
   static Future<void> initTheme() async {

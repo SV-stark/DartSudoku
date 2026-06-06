@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../data/prefs_keys.dart';
 import '../../providers/sudoku_provider.dart';
 import '../../core/sudoku_analyzer.dart';
 import '../components/numpad.dart';
@@ -71,10 +72,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void> _recordDailyChallengeSuccess() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList('completed_daily_challenges') ?? [];
+      final list = prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
       if (!list.contains(widget.dailyChallengeDate)) {
         list.add(widget.dailyChallengeDate!);
-        await prefs.setStringList('completed_daily_challenges', list);
+        await prefs.setStringList(PrefsKeys.completedDailyChallenges, list);
       }
     } catch (_) {}
   }
@@ -328,20 +329,28 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 padding: const EdgeInsets.all(8.0),
                 child: _provider.status == GameStatus.loading
                     ? _buildLoadingState()
-                    : SudokuGrid(
-                        board: _provider.currentBoard,
-                        selectedRow: _provider.selectedRow,
-                        selectedCol: _provider.selectedCol,
-                        isClue: _provider.isOriginalClue,
-                        notes: _provider.notes,
-                        solvedBoard: _provider.solvedBoard,
-                        highlightConflicts: _provider.highlightConflicts,
-                        highlightIdentical: _provider.highlightIdentical,
-                        showMistakes: _provider.showMistakes,
-                        flashRow: _provider.flashRow,
-                        flashCol: _provider.flashCol,
-                        onCellTap: (r, c) {
-                          _provider.selectCell(r, c);
+                    : AnimatedBuilder(
+                        animation: Listenable.merge([
+                          _provider,
+                          _provider.selectionNotifier,
+                        ]),
+                        builder: (context, _) {
+                          return SudokuGrid(
+                            board: _provider.currentBoard,
+                            selectedRow: _provider.selectedRow,
+                            selectedCol: _provider.selectedCol,
+                            isClue: _provider.isOriginalClue,
+                            notes: _provider.notes,
+                            solvedBoard: _provider.solvedBoard,
+                            highlightConflicts: _provider.highlightConflicts,
+                            highlightIdentical: _provider.highlightIdentical,
+                            showMistakes: _provider.showMistakes,
+                            flashRow: _provider.flashRow,
+                            flashCol: _provider.flashCol,
+                            onCellTap: (r, c) {
+                              _provider.selectCell(r, c);
+                            },
+                          );
                         },
                       ),
               ),
@@ -401,20 +410,28 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 child: Center(
                   child: _provider.status == GameStatus.loading
                       ? _buildLoadingState()
-                      : SudokuGrid(
-                          board: _provider.currentBoard,
-                          selectedRow: _provider.selectedRow,
-                          selectedCol: _provider.selectedCol,
-                          isClue: _provider.isOriginalClue,
-                          notes: _provider.notes,
-                          solvedBoard: _provider.solvedBoard,
-                          highlightConflicts: _provider.highlightConflicts,
-                          highlightIdentical: _provider.highlightIdentical,
-                          showMistakes: _provider.showMistakes,
-                          flashRow: _provider.flashRow,
-                          flashCol: _provider.flashCol,
-                          onCellTap: (r, c) {
-                            _provider.selectCell(r, c);
+                      : AnimatedBuilder(
+                          animation: Listenable.merge([
+                            _provider,
+                            _provider.selectionNotifier,
+                          ]),
+                          builder: (context, _) {
+                            return SudokuGrid(
+                              board: _provider.currentBoard,
+                              selectedRow: _provider.selectedRow,
+                              selectedCol: _provider.selectedCol,
+                              isClue: _provider.isOriginalClue,
+                              notes: _provider.notes,
+                              solvedBoard: _provider.solvedBoard,
+                              highlightConflicts: _provider.highlightConflicts,
+                              highlightIdentical: _provider.highlightIdentical,
+                              showMistakes: _provider.showMistakes,
+                              flashRow: _provider.flashRow,
+                              flashCol: _provider.flashCol,
+                              onCellTap: (r, c) {
+                                _provider.selectCell(r, c);
+                              },
+                            );
                           },
                         ),
                 ),
@@ -546,27 +563,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         ),
 
         // Timer Panel (Material 3 Chip look)
-        ActionChip(
-          avatar: Icon(
-            _provider.status == GameStatus.paused
-                ? Icons.play_arrow_rounded
-                : Icons.pause_rounded,
-            color: theme.colorScheme.primary,
-            size: 18,
-          ),
-          label: Text(
-            _provider.formattedTime,
-            style: TextStyle(
-              color: theme.colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          onPressed: () {
-            if (_provider.status == GameStatus.playing) {
-              _provider.pauseGame();
-            } else if (_provider.status == GameStatus.paused) {
-              _provider.resumeGame();
-            }
+        AnimatedBuilder(
+          animation: _provider.timerNotifier,
+          builder: (context, _) {
+            return ActionChip(
+              avatar: Icon(
+                _provider.status == GameStatus.paused
+                    ? Icons.play_arrow_rounded
+                    : Icons.pause_rounded,
+                color: theme.colorScheme.primary,
+                size: 18,
+              ),
+              label: Text(
+                _provider.formattedTime,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onPressed: () {
+                if (_provider.status == GameStatus.playing) {
+                  _provider.pauseGame();
+                } else if (_provider.status == GameStatus.paused) {
+                  _provider.resumeGame();
+                }
+              },
+            );
           },
         ),
       ],
