@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/prefs_keys.dart';
-import '../../providers/sudoku_provider.dart';
+import '../../providers/settings_provider.dart';
+import '../../core/difficulty.dart';
 import '../theme.dart';
 import 'game_screen.dart';
 import 'solver_screen.dart';
@@ -19,7 +20,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late SudokuGameProvider _settingsProvider;
+  late SettingsProvider _settingsProvider;
   bool _isTodayCompleted = false;
   bool _hasSavedGame = false;
   String _savedDifficulty = '';
@@ -29,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _settingsProvider = SudokuGameProvider();
+    _settingsProvider = SettingsProvider.instance;
     _checkTodayCompletion();
     _checkSavedGame();
   }
@@ -41,7 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (hasSaved) {
         setState(() {
           _hasSavedGame = true;
-          _savedDifficulty = prefs.getString(PrefsKeys.savedDifficulty) ?? 'easy';
+          _savedDifficulty =
+              prefs.getString(PrefsKeys.savedDifficulty) ?? 'easy';
           _savedElapsedTime = prefs.getInt(PrefsKeys.savedElapsedSeconds) ?? 0;
           _savedMistakes = prefs.getInt(PrefsKeys.savedMistakes) ?? 0;
         });
@@ -50,20 +52,25 @@ class _HomeScreenState extends State<HomeScreen> {
           _hasSavedGame = false;
         });
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('Error checking saved game in HomeScreen: $e\n$stack');
+    }
   }
 
   Future<void> _checkTodayCompletion() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
+      final list =
+          prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
       final today = DateTime.now();
       final todayStr =
           '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
       setState(() {
         _isTodayCompleted = list.contains(todayStr);
       });
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('Error checking today completion in HomeScreen: $e\n$stack');
+    }
   }
 
   @override
@@ -113,40 +120,42 @@ class _HomeScreenState extends State<HomeScreen> {
           Positioned(
             top: 16,
             right: 16,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ValueListenableBuilder<ThemeMode>(
-                  valueListenable: AppTheme.themeModeNotifier,
-                  builder: (context, themeMode, _) {
-                    return FloatingActionButton.small(
-                      heroTag: 'theme_toggle',
-                      onPressed: AppTheme.toggleTheme,
-                      tooltip: 'Toggle Theme',
-                      child: Icon(
-                        themeMode == ThemeMode.dark
-                            ? Icons.light_mode_rounded
-                            : Icons.dark_mode_rounded,
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-                FloatingActionButton.small(
-                  heroTag: 'settings_btn',
-                  onPressed: () =>
-                      SettingsSheet.show(context, _settingsProvider),
-                  tooltip: 'Settings',
-                  child: const Icon(Icons.tune_rounded),
-                ),
-                const SizedBox(width: 8),
-                FloatingActionButton.small(
-                  heroTag: 'stats_btn',
-                  onPressed: _openStats,
-                  tooltip: 'Analytics',
-                  child: const Icon(Icons.insights_rounded),
-                ),
-              ],
+            child: SafeArea(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ValueListenableBuilder<ThemeMode>(
+                    valueListenable: AppTheme.themeModeNotifier,
+                    builder: (context, themeMode, _) {
+                      return FloatingActionButton.small(
+                        heroTag: 'theme_toggle',
+                        onPressed: AppTheme.toggleTheme,
+                        tooltip: 'Toggle Theme',
+                        child: Icon(
+                          themeMode == ThemeMode.dark
+                              ? Icons.light_mode_rounded
+                              : Icons.dark_mode_rounded,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  FloatingActionButton.small(
+                    heroTag: 'settings_btn',
+                    onPressed: () =>
+                        SettingsSheet.show(context, _settingsProvider),
+                    tooltip: 'Settings',
+                    child: const Icon(Icons.tune_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                  FloatingActionButton.small(
+                    heroTag: 'stats_btn',
+                    onPressed: _openStats,
+                    tooltip: 'Analytics',
+                    child: const Icon(Icons.insights_rounded),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -239,21 +248,21 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               label: 'EASY',
               color: Colors.green,
-              onTap: () => _startGame('easy'),
+              onTap: () => _startGame(Difficulty.easy),
             ),
             const SizedBox(height: 12),
             _buildDifficultyButton(
               context,
               label: 'MEDIUM',
               color: Colors.orange,
-              onTap: () => _startGame('medium'),
+              onTap: () => _startGame(Difficulty.medium),
             ),
             const SizedBox(height: 12),
             _buildDifficultyButton(
               context,
               label: 'HARD',
               color: Colors.red,
-              onTap: () => _startGame('hard'),
+              onTap: () => _startGame(Difficulty.hard),
             ),
           ],
         ),
@@ -345,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _startGame(String difficulty) {
+  void _startGame(Difficulty difficulty) {
     Navigator.push(
       context,
       FadePageRoute(child: GameScreen(difficulty: difficulty)),
@@ -498,7 +507,10 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       FadePageRoute(
-        child: const GameScreen(difficulty: '', resumeSavedGame: true),
+        child: const GameScreen(
+          difficulty: Difficulty.easy,
+          resumeSavedGame: true,
+        ),
       ),
     ).then((_) => _checkSavedGame());
   }

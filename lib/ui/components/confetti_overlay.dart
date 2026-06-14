@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../core/constants.dart';
 
 class ConfettiParticle {
   double x;
@@ -67,7 +68,7 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
       Colors.cyan,
       Colors.orange,
     ];
-    for (int i = 0; i < 80; i++) {
+    for (int i = 0; i < GameConstants.confettiParticleCount; i++) {
       _particles.add(
         ConfettiParticle(
           x: _random.nextDouble() * _screenSize!.width,
@@ -85,20 +86,18 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
 
   void _updateParticles() {
     if (!mounted || _screenSize == null) return;
-    setState(() {
-      for (var p in _particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.rotation += p.rotationSpeed;
+    for (var p in _particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rotation += p.rotationSpeed;
 
-        // Reset particle if it falls off the bottom or sides
-        if (p.y > _screenSize!.height) {
-          p.y = -20;
-          p.x = _random.nextDouble() * _screenSize!.width;
-          p.vy = 2.0 + _random.nextDouble() * 4;
-        }
+      // Reset particle if it falls off the bottom or sides
+      if (p.y > _screenSize!.height) {
+        p.y = -20;
+        p.x = _random.nextDouble() * _screenSize!.width;
+        p.vy = 2.0 + _random.nextDouble() * 4;
       }
-    });
+    }
   }
 
   @override
@@ -111,7 +110,7 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: CustomPaint(
-        painter: ConfettiPainter(_particles),
+        painter: ConfettiPainter(_particles, repaint: _controller),
         size: Size.infinite,
       ),
     );
@@ -121,7 +120,8 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
 class ConfettiPainter extends CustomPainter {
   final List<ConfettiParticle> particles;
 
-  ConfettiPainter(this.particles);
+  ConfettiPainter(this.particles, {required Listenable repaint})
+    : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {

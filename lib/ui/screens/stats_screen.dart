@@ -35,19 +35,6 @@ class _StatsScreenState extends State<StatsScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  Color _getDifficultyColor(String diff) {
-    switch (diff.toLowerCase()) {
-      case 'easy':
-        return Colors.green;
-      case 'medium':
-        return Colors.orange;
-      case 'hard':
-        return Colors.red;
-      default:
-        return Colors.blue;
-    }
-  }
-
   Future<void> _confirmReset() async {
     final theme = Theme.of(context);
 
@@ -298,7 +285,7 @@ class _StatsScreenState extends State<StatsScreen> {
 
   Widget _buildDifficultyCard(String difficulty, SudokuStats stats) {
     final theme = Theme.of(context);
-    final Color diffColor = _getDifficultyColor(difficulty);
+    final Color diffColor = AppTheme.getDifficultyColor(difficulty);
     final double winRate = stats.gamesPlayed > 0
         ? (stats.gamesWon / stats.gamesPlayed) * 100
         : 0.0;

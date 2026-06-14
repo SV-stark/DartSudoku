@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
-import 'package:flutter/material.dart';
+import 'dart:isolate';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/sudoku_logic.dart';
 import '../core/stats_manager.dart';
+import '../core/difficulty.dart';
+import '../core/constants.dart';
 import '../data/prefs_keys.dart';
+import 'settings_provider.dart';
 
 /// Represents a snapshot of the board state for undo functionality.
 class BoardState {
@@ -13,16 +16,6 @@ class BoardState {
   final List<List<Set<int>>> notes;
 
   BoardState({required this.board, required this.notes});
-
-  BoardState clone() {
-    return BoardState(
-      board: List.generate(9, (r) => List.from(board[r])),
-      notes: List.generate(
-        9,
-        (r) => List.generate(9, (c) => Set.from(notes[r][c])),
-      ),
-    );
-  }
 }
 
 enum GameStatus { idle, loading, playing, paused, won, gameOver }
@@ -32,23 +25,33 @@ class SudokuGameProvider extends ChangeNotifier {
   final ChangeNotifier selectionNotifier = ChangeNotifier();
   final ChangeNotifier timerNotifier = ChangeNotifier();
 
-  List<List<int>> _currentBoard = List.generate(9, (_) => List.filled(9, 0));
-  List<List<int>> _solvedBoard = List.generate(9, (_) => List.filled(9, 0));
+  List<List<int>> _currentBoard = List.generate(
+    GameConstants.boardSize,
+    (_) => List.filled(GameConstants.boardSize, 0),
+  );
+  List<List<int>> _solvedBoard = List.generate(
+    GameConstants.boardSize,
+    (_) => List.filled(GameConstants.boardSize, 0),
+  );
   List<List<bool>> _isOriginalClue = List.generate(
-    9,
-    (_) => List.filled(9, false),
+    GameConstants.boardSize,
+    (_) => List.filled(GameConstants.boardSize, false),
   );
   List<List<Set<int>>> _notes = List.generate(
-    9,
-    (_) => List.generate(9, (_) => {}),
+    GameConstants.boardSize,
+    (_) => List.generate(GameConstants.boardSize, (_) => {}),
   );
+
+  // Unmodifiable cached representations to expose to UI safely
+  List<List<int>> _unmodifiableCurrentBoard = [];
+  List<List<bool>> _unmodifiableIsOriginalClue = [];
+  List<List<Set<int>>> _unmodifiableNotes = [];
 
   int _selectedRow = -1;
   int _selectedCol = -1;
 
   int _mistakes = 0;
-  final int maxMistakes = 3;
-  String _difficulty = 'easy';
+  Difficulty _difficulty = Difficulty.easy;
   String? _dailyChallengeDate;
   GameStatus _status = GameStatus.idle;
 
@@ -62,27 +65,30 @@ class SudokuGameProvider extends ChangeNotifier {
   int _flashRow = -1;
   int _flashCol = -1;
 
-  // Settings properties
-  bool _showMistakes = true;
-  bool _highlightConflicts = true;
-  bool _highlightIdentical = true;
-  bool _endlessMode = false;
-  bool _autoRemoveNotes = true;
+  // Cached dynamic counts to avoid O(81) loops during widget rebuilds
+  Map<int, int> _numberCounts = {};
+  int _totalClues = 0;
 
   SudokuGameProvider() {
-    loadSettings();
+    SettingsProvider.instance.addListener(_onSettingsChanged);
+    _onBoardStateChanged();
   }
 
-  // Getters
-  List<List<int>> get currentBoard => _currentBoard;
-  List<List<int>> get solvedBoard => _solvedBoard;
-  List<List<bool>> get isOriginalClue => _isOriginalClue;
-  List<List<Set<int>>> get notes => _notes;
+  void _onSettingsChanged() {
+    notifyListeners();
+  }
+
+  // Getters for internal boards (Unmodifiable views)
+  List<List<int>> get currentBoard => _unmodifiableCurrentBoard;
+  List<List<int>> get solvedBoard => _solvedBoard; // Used internally/by test
+  List<List<bool>> get isOriginalClue => _unmodifiableIsOriginalClue;
+  List<List<Set<int>>> get notes => _unmodifiableNotes;
 
   int get selectedRow => _selectedRow;
   int get selectedCol => _selectedCol;
   int get mistakes => _mistakes;
-  String get difficulty => _difficulty;
+  int get maxMistakes => GameConstants.maxMistakes;
+  Difficulty get difficulty => _difficulty;
   GameStatus get status => _status;
   bool get notesMode => _notesMode;
   int get elapsedSeconds => _elapsedSeconds;
@@ -92,31 +98,17 @@ class SudokuGameProvider extends ChangeNotifier {
   int get flashRow => _flashRow;
   int get flashCol => _flashCol;
 
-  bool get showMistakes => _showMistakes;
-  bool get highlightConflicts => _highlightConflicts;
-  bool get highlightIdentical => _highlightIdentical;
-  bool get endlessMode => _endlessMode;
-  bool get autoRemoveNotes => _autoRemoveNotes;
+  // Settings properties delegated to SettingsProvider
+  bool get showMistakes => SettingsProvider.instance.showMistakes;
+  bool get highlightConflicts => SettingsProvider.instance.highlightConflicts;
+  bool get highlightIdentical => SettingsProvider.instance.highlightIdentical;
+  bool get endlessMode => SettingsProvider.instance.endlessMode;
+  bool get autoRemoveNotes => SettingsProvider.instance.autoRemoveNotes;
 
-  Map<int, int> get numberCounts {
-    final counts = <int, int>{};
-    for (int i = 1; i <= 9; i++) {
-      counts[i] = 9;
-    }
-    for (int r = 0; r < 9; r++) {
-      for (int c = 0; c < 9; c++) {
-        final val = _currentBoard[r][c];
-        if (val != 0) {
-          counts[val] = (counts[val] ?? 9) - 1;
-        }
-      }
-    }
-    counts.forEach((key, value) {
-      if (value < 0) counts[key] = 0;
-    });
-    return counts;
-  }
+  Map<int, int> get numberCounts => _numberCounts;
+  int get totalClues => _totalClues;
 
+  /// Delegated settings updates
   Future<void> updateSettings({
     bool? showMistakes,
     bool? highlightConflicts,
@@ -124,40 +116,13 @@ class SudokuGameProvider extends ChangeNotifier {
     bool? endlessMode,
     bool? autoRemoveNotes,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (showMistakes != null) {
-      _showMistakes = showMistakes;
-      await prefs.setBool(PrefsKeys.showMistakes, showMistakes);
-    }
-    if (highlightConflicts != null) {
-      _highlightConflicts = highlightConflicts;
-      await prefs.setBool(PrefsKeys.highlightConflicts, highlightConflicts);
-    }
-    if (highlightIdentical != null) {
-      _highlightIdentical = highlightIdentical;
-      await prefs.setBool(PrefsKeys.highlightIdentical, highlightIdentical);
-    }
-    if (endlessMode != null) {
-      _endlessMode = endlessMode;
-      await prefs.setBool(PrefsKeys.endlessMode, endlessMode);
-    }
-    if (autoRemoveNotes != null) {
-      _autoRemoveNotes = autoRemoveNotes;
-      await prefs.setBool(PrefsKeys.autoRemoveNotes, autoRemoveNotes);
-    }
-    notifyListeners();
-  }
-
-  Future<void> loadSettings() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _showMistakes = prefs.getBool(PrefsKeys.showMistakes) ?? true;
-      _highlightConflicts = prefs.getBool(PrefsKeys.highlightConflicts) ?? true;
-      _highlightIdentical = prefs.getBool(PrefsKeys.highlightIdentical) ?? true;
-      _endlessMode = prefs.getBool(PrefsKeys.endlessMode) ?? false;
-      _autoRemoveNotes = prefs.getBool(PrefsKeys.autoRemoveNotes) ?? true;
-      notifyListeners();
-    } catch (_) {}
+    await SettingsProvider.instance.updateSettings(
+      showMistakes: showMistakes,
+      highlightConflicts: highlightConflicts,
+      highlightIdentical: highlightIdentical,
+      endlessMode: endlessMode,
+      autoRemoveNotes: autoRemoveNotes,
+    );
   }
 
   String get formattedTime {
@@ -174,21 +139,20 @@ class SudokuGameProvider extends ChangeNotifier {
   }
 
   /// Start a new game with [difficulty], optionally seeded for a [dailyDate] challenge
-  Future<void> newGame(String difficulty, {String? dailyDate}) async {
+  Future<void> newGame(Difficulty difficulty, {String? dailyDate}) async {
     _status = GameStatus.loading;
     notifyListeners();
 
-    Random? random;
+    int? seed;
     if (dailyDate != null) {
       // Create a deterministic seed from the date string, e.g. "2026-06-05" -> 20260605
       final cleanDate = dailyDate.replaceAll('-', '');
-      final seed = int.tryParse(cleanDate) ?? dailyDate.hashCode;
-      random = Random(seed);
+      seed = int.tryParse(cleanDate) ?? dailyDate.hashCode;
     }
 
-    // Generate puzzle
-    final puzzle = await Future.value(
-      SudokuLogic.generatePuzzle(difficulty, random: random),
+    // Generate puzzle asynchronously in a background isolate to keep UI responsive
+    final puzzle = await Isolate.run(
+      () => SudokuLogic.generatePuzzle(difficulty, seed: seed),
     );
 
     _difficulty = difficulty;
@@ -196,10 +160,16 @@ class SudokuGameProvider extends ChangeNotifier {
     _currentBoard = SudokuLogic.copyBoard(puzzle.puzzleBoard);
     _solvedBoard = SudokuLogic.copyBoard(puzzle.solvedBoard);
     _isOriginalClue = List.generate(
-      9,
-      (r) => List.generate(9, (c) => puzzle.puzzleBoard[r][c] != 0),
+      GameConstants.boardSize,
+      (r) => List.generate(
+        GameConstants.boardSize,
+        (c) => puzzle.puzzleBoard[r][c] != 0,
+      ),
     );
-    _notes = List.generate(9, (_) => List.generate(9, (_) => {}));
+    _notes = List.generate(
+      GameConstants.boardSize,
+      (_) => List.generate(GameConstants.boardSize, (_) => {}),
+    );
 
     _selectedRow = -1;
     _selectedCol = -1;
@@ -208,6 +178,8 @@ class SudokuGameProvider extends ChangeNotifier {
     _notesMode = false;
     _undoHistory.clear();
     _redoHistory.clear();
+
+    _onBoardStateChanged();
 
     _status = GameStatus.playing;
     _startTimer();
@@ -234,13 +206,16 @@ class SudokuGameProvider extends ChangeNotifier {
       BoardState(
         board: SudokuLogic.copyBoard(_currentBoard),
         notes: List.generate(
-          9,
-          (r) => List.generate(9, (c) => Set.from(_notes[r][c])),
+          GameConstants.boardSize,
+          (r) => List.generate(
+            GameConstants.boardSize,
+            (c) => Set.from(_notes[r][c]),
+          ),
         ),
       ),
     );
-    // Limit history size to 20 to prevent excessive memory usage
-    if (_undoHistory.length > 20) {
+    // Limit history size to prevent excessive memory usage
+    if (_undoHistory.length > GameConstants.maxUndoHistory) {
       _undoHistory.removeAt(0);
     }
   }
@@ -260,8 +235,8 @@ class SudokuGameProvider extends ChangeNotifier {
     List<List<int>> oldBoard,
     List<List<int>> newBoard,
   ) {
-    for (int r = 0; r < 9; r++) {
-      for (int c = 0; c < 9; c++) {
+    for (int r = 0; r < GameConstants.boardSize; r++) {
+      for (int c = 0; c < GameConstants.boardSize; c++) {
         if (oldBoard[r][c] != newBoard[r][c]) {
           triggerFlash(r, c);
           return;
@@ -271,15 +246,18 @@ class SudokuGameProvider extends ChangeNotifier {
   }
 
   /// Performs an undo action
-  void undo() {
+  Future<void> undo() async {
     if (_status != GameStatus.playing || _undoHistory.isEmpty) return;
 
     _redoHistory.add(
       BoardState(
         board: SudokuLogic.copyBoard(_currentBoard),
         notes: List.generate(
-          9,
-          (r) => List.generate(9, (c) => Set.from(_notes[r][c])),
+          GameConstants.boardSize,
+          (r) => List.generate(
+            GameConstants.boardSize,
+            (c) => Set.from(_notes[r][c]),
+          ),
         ),
       ),
     );
@@ -289,21 +267,25 @@ class SudokuGameProvider extends ChangeNotifier {
     _currentBoard = prevState.board;
     _notes = prevState.notes;
 
+    _onBoardStateChanged();
     _findAndFlashDifference(oldBoard, _currentBoard);
     notifyListeners();
-    _saveGameState();
+    await _saveGameState();
   }
 
   /// Performs a redo action
-  void redo() {
+  Future<void> redo() async {
     if (_status != GameStatus.playing || _redoHistory.isEmpty) return;
 
     _undoHistory.add(
       BoardState(
         board: SudokuLogic.copyBoard(_currentBoard),
         notes: List.generate(
-          9,
-          (r) => List.generate(9, (c) => Set.from(_notes[r][c])),
+          GameConstants.boardSize,
+          (r) => List.generate(
+            GameConstants.boardSize,
+            (c) => Set.from(_notes[r][c]),
+          ),
         ),
       ),
     );
@@ -313,13 +295,14 @@ class SudokuGameProvider extends ChangeNotifier {
     _currentBoard = nextState.board;
     _notes = nextState.notes;
 
+    _onBoardStateChanged();
     _findAndFlashDifference(oldBoard, _currentBoard);
     notifyListeners();
-    _saveGameState();
+    await _saveGameState();
   }
 
   /// Input a number from the numpad
-  void enterNumber(int number) {
+  Future<void> enterNumber(int number) async {
     if (_status != GameStatus.playing) return;
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
@@ -334,6 +317,7 @@ class SudokuGameProvider extends ChangeNotifier {
         _currentBoard[_selectedRow][_selectedCol] =
             0; // Clear cell if placing a note
       }
+      _onBoardStateChanged();
     } else {
       // Direct number input
       if (_currentBoard[_selectedRow][_selectedCol] == number) return;
@@ -341,22 +325,24 @@ class SudokuGameProvider extends ChangeNotifier {
       _saveToHistory();
       _currentBoard[_selectedRow][_selectedCol] = number;
       _notes[_selectedRow][_selectedCol].clear(); // Clear notes for this cell
+      _onBoardStateChanged();
 
       // Check if the number is correct compared to solution
       if (number != _solvedBoard[_selectedRow][_selectedCol]) {
-        if (_showMistakes) {
+        if (showMistakes) {
           _mistakes++;
-          if (!_endlessMode && _mistakes >= maxMistakes) {
+          if (!endlessMode && _mistakes >= GameConstants.maxMistakes) {
             _status = GameStatus.gameOver;
             _stopTimer();
-            _clearSavedGame();
+            await _clearSavedGame();
             StatsManager.recordGameLoss();
           }
         }
       } else {
         // Auto-clean notes for surrounding cells in same row, column, and box
-        if (_autoRemoveNotes) {
+        if (autoRemoveNotes) {
           _cleanSurroundingNotes(_selectedRow, _selectedCol, number);
+          _onBoardStateChanged();
         }
       }
 
@@ -364,16 +350,16 @@ class SudokuGameProvider extends ChangeNotifier {
       if (_checkWin()) {
         _status = GameStatus.won;
         _stopTimer();
-        _clearSavedGame();
+        await _clearSavedGame();
         StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
       }
     }
     notifyListeners();
-    _saveGameState();
+    await _saveGameState();
   }
 
   /// Clears the selected cell
-  void eraseCell() {
+  Future<void> eraseCell() async {
     if (_status != GameStatus.playing) return;
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
@@ -385,12 +371,13 @@ class SudokuGameProvider extends ChangeNotifier {
     _saveToHistory();
     _currentBoard[_selectedRow][_selectedCol] = 0;
     _notes[_selectedRow][_selectedCol].clear();
+    _onBoardStateChanged();
     notifyListeners();
-    _saveGameState();
+    await _saveGameState();
   }
 
   /// Reveals the correct value for the selected cell
-  void revealHint() {
+  Future<void> revealHint() async {
     if (_status != GameStatus.playing) return;
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
@@ -401,42 +388,44 @@ class SudokuGameProvider extends ChangeNotifier {
     _saveToHistory();
     _currentBoard[_selectedRow][_selectedCol] = correctVal;
     _notes[_selectedRow][_selectedCol].clear();
+    _onBoardStateChanged();
 
-    if (_autoRemoveNotes) {
+    if (autoRemoveNotes) {
       _cleanSurroundingNotes(_selectedRow, _selectedCol, correctVal);
+      _onBoardStateChanged();
     }
 
     if (_checkWin()) {
       _status = GameStatus.won;
       _stopTimer();
-      _clearSavedGame();
+      await _clearSavedGame();
       StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
     }
     notifyListeners();
-    _saveGameState();
+    await _saveGameState();
   }
 
-  void pauseGame() {
+  Future<void> pauseGame() async {
     if (_status == GameStatus.playing) {
       _status = GameStatus.paused;
       _stopTimer();
       notifyListeners();
-      _saveGameState();
+      await _saveGameState();
     }
   }
 
-  void resumeGame() {
+  Future<void> resumeGame() async {
     if (_status == GameStatus.paused) {
       _status = GameStatus.playing;
       _startTimer();
       notifyListeners();
-      _saveGameState();
+      await _saveGameState();
     }
   }
 
   void _cleanSurroundingNotes(int row, int col, int value) {
     // Row & Col clean
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < GameConstants.boardSize; i++) {
       _notes[row][i].remove(value);
       _notes[i][col].remove(value);
     }
@@ -451,8 +440,8 @@ class SudokuGameProvider extends ChangeNotifier {
   }
 
   bool _checkWin() {
-    for (int r = 0; r < 9; r++) {
-      for (int c = 0; c < 9; c++) {
+    for (int r = 0; r < GameConstants.boardSize; r++) {
+      for (int c = 0; c < GameConstants.boardSize; c++) {
         if (_currentBoard[r][c] != _solvedBoard[r][c]) {
           return false;
         }
@@ -466,7 +455,10 @@ class SudokuGameProvider extends ChangeNotifier {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _elapsedSeconds++;
       timerNotifier.notifyListeners();
-      _saveGameState();
+      // Save game state at most once every 10 seconds to limit disk writes
+      if (_elapsedSeconds % 10 == 0) {
+        _saveGameState();
+      }
     });
   }
 
@@ -477,10 +469,63 @@ class SudokuGameProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    SettingsProvider.instance.removeListener(_onSettingsChanged);
     _stopTimer();
     selectionNotifier.dispose();
     timerNotifier.dispose();
     super.dispose();
+  }
+
+  // Update incremental cached state values
+  void _onBoardStateChanged() {
+    _updateUnmodifiableViews();
+    _updateNumberCounts();
+    _updateTotalClues();
+  }
+
+  void _updateUnmodifiableViews() {
+    _unmodifiableCurrentBoard = List<List<int>>.unmodifiable(
+      _currentBoard.map((row) => List<int>.unmodifiable(row)),
+    );
+    _unmodifiableIsOriginalClue = List<List<bool>>.unmodifiable(
+      _isOriginalClue.map((row) => List<bool>.unmodifiable(row)),
+    );
+    _unmodifiableNotes = List<List<Set<int>>>.unmodifiable(
+      _notes.map(
+        (row) => List<Set<int>>.unmodifiable(
+          row.map((s) => Set<int>.unmodifiable(s)),
+        ),
+      ),
+    );
+  }
+
+  void _updateNumberCounts() {
+    final counts = <int, int>{};
+    for (int i = 1; i <= 9; i++) {
+      counts[i] = 9;
+    }
+    for (int r = 0; r < GameConstants.boardSize; r++) {
+      for (int c = 0; c < GameConstants.boardSize; c++) {
+        final val = _currentBoard[r][c];
+        if (val != 0) {
+          counts[val] = (counts[val] ?? 9) - 1;
+        }
+      }
+    }
+    counts.forEach((key, value) {
+      if (value < 0) counts[key] = 0;
+    });
+    _numberCounts = Map.unmodifiable(counts);
+  }
+
+  void _updateTotalClues() {
+    int count = 0;
+    for (int r = 0; r < GameConstants.boardSize; r++) {
+      for (int c = 0; c < GameConstants.boardSize; c++) {
+        if (_isOriginalClue[r][c]) count++;
+      }
+    }
+    _totalClues = count;
   }
 
   Future<void> _saveGameState() async {
@@ -489,28 +534,39 @@ class SudokuGameProvider extends ChangeNotifier {
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(PrefsKeys.savedDifficulty, _difficulty);
+      await prefs.setString(PrefsKeys.savedDifficulty, _difficulty.name);
       if (_dailyChallengeDate != null) {
         await prefs.setString(PrefsKeys.savedDailyDate, _dailyChallengeDate!);
       } else {
         await prefs.remove(PrefsKeys.savedDailyDate);
       }
-      await prefs.setString(PrefsKeys.savedCurrentBoard, jsonEncode(_currentBoard));
-      await prefs.setString(PrefsKeys.savedSolvedBoard, jsonEncode(_solvedBoard));
+      await prefs.setString(
+        PrefsKeys.savedCurrentBoard,
+        jsonEncode(_currentBoard),
+      );
+      await prefs.setString(
+        PrefsKeys.savedSolvedBoard,
+        jsonEncode(_solvedBoard),
+      );
       await prefs.setString(
         PrefsKeys.savedIsOriginalClue,
         jsonEncode(_isOriginalClue),
       );
 
       final notesList = List.generate(
-        9,
-        (r) => List.generate(9, (c) => _notes[r][c].toList()),
+        GameConstants.boardSize,
+        (r) => List.generate(
+          GameConstants.boardSize,
+          (c) => _notes[r][c].toList(),
+        ),
       );
       await prefs.setString(PrefsKeys.savedNotes, jsonEncode(notesList));
       await prefs.setInt(PrefsKeys.savedMistakes, _mistakes);
       await prefs.setInt(PrefsKeys.savedElapsedSeconds, _elapsedSeconds);
       await prefs.setBool(PrefsKeys.hasSavedGame, true);
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('Error saving game state in SudokuGameProvider: $e\n$stack');
+    }
   }
 
   Future<void> _clearSavedGame() async {
@@ -525,7 +581,18 @@ class SudokuGameProvider extends ChangeNotifier {
       await prefs.remove(PrefsKeys.savedMistakes);
       await prefs.remove(PrefsKeys.savedElapsedSeconds);
       await prefs.setBool(PrefsKeys.hasSavedGame, false);
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('Error clearing saved game in SudokuGameProvider: $e\n$stack');
+    }
+  }
+
+  Difficulty _parseDifficulty(String? name) {
+    if (name == null) return Difficulty.easy;
+    try {
+      return Difficulty.values.byName(name.toLowerCase());
+    } catch (_) {
+      return Difficulty.easy;
+    }
   }
 
   Future<void> loadSavedGame() async {
@@ -534,39 +601,45 @@ class SudokuGameProvider extends ChangeNotifier {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      _difficulty = prefs.getString(PrefsKeys.savedDifficulty) ?? 'easy';
+      final diffStr = prefs.getString(PrefsKeys.savedDifficulty);
+      _difficulty = _parseDifficulty(diffStr);
       final dailyDate = prefs.getString(PrefsKeys.savedDailyDate);
       _dailyChallengeDate = (dailyDate == null || dailyDate.isEmpty)
           ? null
           : dailyDate;
 
-      final currentBoardStr = prefs.getString(PrefsKeys.savedCurrentBoard) ?? '';
+      final currentBoardStr =
+          prefs.getString(PrefsKeys.savedCurrentBoard) ?? '';
       final solvedBoardStr = prefs.getString(PrefsKeys.savedSolvedBoard) ?? '';
-      final originalClueStr = prefs.getString(PrefsKeys.savedIsOriginalClue) ?? '';
+      final originalClueStr =
+          prefs.getString(PrefsKeys.savedIsOriginalClue) ?? '';
       final notesStr = prefs.getString(PrefsKeys.savedNotes) ?? '';
 
       final dynamic currentBoardJson = jsonDecode(currentBoardStr);
       _currentBoard = List.generate(
-        9,
+        GameConstants.boardSize,
         (r) => List<int>.from(currentBoardJson[r]),
       );
 
       final dynamic solvedBoardJson = jsonDecode(solvedBoardStr);
       _solvedBoard = List.generate(
-        9,
+        GameConstants.boardSize,
         (r) => List<int>.from(solvedBoardJson[r]),
       );
 
       final dynamic originalClueJson = jsonDecode(originalClueStr);
       _isOriginalClue = List.generate(
-        9,
+        GameConstants.boardSize,
         (r) => List<bool>.from(originalClueJson[r]),
       );
 
       final dynamic notesJson = jsonDecode(notesStr);
       _notes = List.generate(
-        9,
-        (r) => List.generate(9, (c) => Set<int>.from(notesJson[r][c])),
+        GameConstants.boardSize,
+        (r) => List.generate(
+          GameConstants.boardSize,
+          (c) => Set<int>.from(notesJson[r][c]),
+        ),
       );
 
       _mistakes = prefs.getInt(PrefsKeys.savedMistakes) ?? 0;
@@ -578,10 +651,13 @@ class SudokuGameProvider extends ChangeNotifier {
       _undoHistory.clear();
       _redoHistory.clear();
 
+      _onBoardStateChanged();
+
       _status = GameStatus.playing;
       _startTimer();
       notifyListeners();
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('Error loading saved game in SudokuGameProvider: $e\n$stack');
       _status = GameStatus.idle;
       notifyListeners();
     }
@@ -594,7 +670,10 @@ enum SolverStatus { idle, solving, solved, error }
 class SudokuSolverProvider extends ChangeNotifier {
   final ChangeNotifier selectionNotifier = ChangeNotifier();
 
-  List<List<int>> _solverBoard = List.generate(9, (_) => List.filled(9, 0));
+  List<List<int>> _solverBoard = List.generate(
+    GameConstants.boardSize,
+    (_) => List.filled(GameConstants.boardSize, 0),
+  );
   int _selectedRow = -1;
   int _selectedCol = -1;
   SolverStatus _status = SolverStatus.idle;
@@ -634,7 +713,10 @@ class SudokuSolverProvider extends ChangeNotifier {
   }
 
   void clearBoard() {
-    _solverBoard = List.generate(9, (_) => List.filled(9, 0));
+    _solverBoard = List.generate(
+      GameConstants.boardSize,
+      (_) => List.filled(GameConstants.boardSize, 0),
+    );
     _selectedRow = -1;
     _selectedCol = -1;
     _status = SolverStatus.idle;

@@ -1,4 +1,6 @@
 import 'dart:math';
+import 'difficulty.dart';
+import 'constants.dart';
 
 /// Representation and core logic for Sudoku operations.
 class SudokuLogic {
@@ -192,35 +194,37 @@ class SudokuLogic {
   }
 
   /// Generates a Sudoku game with a unique solution according to [difficulty].
-  /// [difficulty] can be 'easy', 'medium', or 'hard'.
-  static SudokuPuzzle generatePuzzle(String difficulty, {Random? random}) {
+  static SudokuPuzzle generatePuzzle(Difficulty difficulty, {int? seed}) {
+    final random = seed != null ? Random(seed) : Random();
     int cellsToRemove;
-    switch (difficulty.toLowerCase()) {
-      case 'easy':
-        cellsToRemove = 49; // Leaves 32 clues
+    switch (difficulty) {
+      case Difficulty.easy:
+        cellsToRemove = GameConstants.easyCellsToRemove;
         break;
-      case 'medium':
-        cellsToRemove = 54; // Leaves 27 clues
+      case Difficulty.medium:
+        cellsToRemove = GameConstants.mediumCellsToRemove;
         break;
-      case 'hard':
-        cellsToRemove = 59; // Leaves 22 clues
+      case Difficulty.hard:
+        cellsToRemove = GameConstants.hardCellsToRemove;
         break;
-      default:
-        cellsToRemove = 49;
     }
 
     List<List<int>> solved = [];
     List<List<int>> puzzle = [];
 
     // Retry generation if a random removal sequence gets stuck before reaching target
-    for (int attempt = 0; attempt < 5; attempt++) {
+    for (
+      int attempt = 0;
+      attempt < GameConstants.maxGenerationRetries;
+      attempt++
+    ) {
       solved = generateSolvedBoard(random: random);
       puzzle = copyBoard(solved);
 
       // List of coordinates to try removing
       List<Point<int>> coordinates = [];
-      for (int r = 0; r < 9; r++) {
-        for (int c = 0; c < 9; c++) {
+      for (int r = 0; r < GameConstants.boardSize; r++) {
+        for (int c = 0; c < GameConstants.boardSize; c++) {
           coordinates.add(Point(r, c));
         }
       }
@@ -262,7 +266,7 @@ class SudokuLogic {
 class SudokuPuzzle {
   final List<List<int>> solvedBoard;
   final List<List<int>> puzzleBoard;
-  final String difficulty;
+  final Difficulty difficulty;
 
   SudokuPuzzle({
     required this.solvedBoard,

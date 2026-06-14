@@ -6,7 +6,8 @@ class PrefsKeys {
   static const String themeMode = 'sudoku_app_theme_mode';
 
   // Stats Key
-  static const String stats = 'sudoku_nexus_stats'; // Legacy key name preserved for compatibility
+  static const String stats =
+      'sudoku_nexus_stats'; // Legacy key name preserved for compatibility
 
   // Settings Keys
   static const String showMistakes = 'show_mistakes';

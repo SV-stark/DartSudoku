@@ -3,16 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/prefs_keys.dart';
 import '../../providers/sudoku_provider.dart';
+import '../../core/difficulty.dart';
 import '../../core/sudoku_analyzer.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
 import '../components/confetti_overlay.dart';
 import '../theme.dart';
 import 'settings_sheet.dart';
+import '../../providers/settings_provider.dart';
 
 /// The game screen where players solve generated boards.
 class GameScreen extends StatefulWidget {
-  final String difficulty;
+  final Difficulty difficulty;
   final String? dailyChallengeDate;
   final bool resumeSavedGame;
 
@@ -72,12 +74,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void> _recordDailyChallengeSuccess() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
+      final list =
+          prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
       if (!list.contains(widget.dailyChallengeDate)) {
         list.add(widget.dailyChallengeDate!);
         await prefs.setStringList(PrefsKeys.completedDailyChallenges, list);
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint(
+        'Error recording daily challenge success in GameScreen: $e\n$stack',
+      );
+    }
   }
 
   @override
@@ -174,19 +181,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         }
         _provider.selectCell(r, c);
       }
-    }
-  }
-
-  Color _getDifficultyColor(String diff) {
-    switch (diff.toLowerCase()) {
-      case 'easy':
-        return Colors.green;
-      case 'medium':
-        return Colors.orange;
-      case 'hard':
-        return Colors.red;
-      default:
-        return Colors.blue;
     }
   }
 
@@ -312,7 +306,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final gameColor = _getDifficultyColor(_provider.difficulty);
+    final gameColor = AppTheme.getDifficultyColor(_provider.difficulty);
     final size = MediaQuery.of(context).size;
     final isLandscape = size.width > size.height;
 
@@ -531,7 +525,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(width: 8),
             IconButton.filledTonal(
-              onPressed: () => SettingsSheet.show(context, _provider),
+              onPressed: () =>
+                  SettingsSheet.show(context, SettingsProvider.instance),
               tooltip: 'Settings',
               icon: const Icon(Icons.tune_rounded),
             ),
@@ -552,7 +547,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           child: Text(
             widget.dailyChallengeDate != null
                 ? 'DAILY CHALLENGE'
-                : _provider.difficulty.toUpperCase(),
+                : _provider.difficulty.name.toUpperCase(),
             style: TextStyle(
               color: difficultyColor,
               fontSize: 14,
@@ -638,11 +633,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
         // Progress or clues count
         Text(
-          'Total Clues: ${widget.difficulty.toLowerCase() == 'easy'
-              ? '32'
-              : widget.difficulty.toLowerCase() == 'medium'
-              ? '27'
-              : '22'}',
+          'Total Clues: ${_provider.totalClues}',
           style: TextStyle(
             color: theme.colorScheme.onSurfaceVariant,
             fontSize: 13,

@@ -72,7 +72,7 @@ class _TutorialScreenState extends State<TutorialScreen>
   Timer? _lessonPlayTimer;
   DateTime? _practiceStage0StartTime;
   int _totalMistakesMade = 0;
-  List<double> _stage0SolveTimes = [];
+  final List<double> _stage0SolveTimes = [];
 
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;

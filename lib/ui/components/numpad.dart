@@ -200,7 +200,8 @@ class SudokuNumpad extends StatelessWidget {
           ),
           clipBehavior: Clip.antiAlias,
           child: Semantics(
-            label: 'Number $number, ${isCompleted ? "completed" : "$remainingCount remaining"}',
+            label:
+                'Number $number, ${isCompleted ? "completed" : "$remainingCount remaining"}',
             button: true,
             child: InkWell(
               onTap: () => onNumberTap(number),

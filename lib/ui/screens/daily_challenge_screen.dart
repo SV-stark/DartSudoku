@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/prefs_keys.dart';
+import '../../core/difficulty.dart';
 import '../theme.dart';
 import 'game_screen.dart';
 
@@ -30,8 +31,13 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
     });
     try {
       final prefs = await SharedPreferences.getInstance();
-      _completedDates = prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
-    } catch (_) {}
+      _completedDates =
+          prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
+    } catch (e, stack) {
+      debugPrint(
+        'Error loading completions in DailyChallengeScreen: $e\n$stack',
+      );
+    }
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -39,27 +45,14 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
     }
   }
 
-  String _getDifficultyForDay(DateTime date) {
+  Difficulty _getDifficultyForDay(DateTime date) {
     final weekday = date.weekday;
     if (weekday == DateTime.monday || weekday == DateTime.tuesday) {
-      return 'easy';
+      return Difficulty.easy;
     } else if (weekday == DateTime.wednesday || weekday == DateTime.thursday) {
-      return 'medium';
+      return Difficulty.medium;
     } else {
-      return 'hard';
-    }
-  }
-
-  Color _getDifficultyColor(String diff) {
-    switch (diff.toLowerCase()) {
-      case 'easy':
-        return Colors.green;
-      case 'medium':
-        return Colors.orange;
-      case 'hard':
-        return Colors.red;
-      default:
-        return Colors.blue;
+      return Difficulty.hard;
     }
   }
 
@@ -247,7 +240,7 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
       final bool isFuture = cellDate.isAfter(today);
 
       final difficulty = _getDifficultyForDay(cellDate);
-      final diffColor = _getDifficultyColor(difficulty);
+      final diffColor = AppTheme.getDifficultyColor(difficulty);
 
       dayWidgets.add(
         GestureDetector(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/prefs_keys.dart';
+import '../core/difficulty.dart';
 
 /// Centralized Material 3 theme helpers and color mapping.
 class AppTheme {
@@ -21,7 +22,9 @@ class AppTheme {
       if (modeIndex != null) {
         themeModeNotifier.value = ThemeMode.values[modeIndex];
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('Error in AppTheme.initTheme: $e\n$stack');
+    }
   }
 
   /// Toggle between Dark and Light themes and persist selection.
@@ -32,7 +35,29 @@ class AppTheme {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_themeKey, next.index);
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('Error in AppTheme.toggleTheme: $e\n$stack');
+    }
+  }
+
+  /// Centralized mapping of difficulty to its semantic theme color.
+  static Color getDifficultyColor(dynamic difficulty) {
+    final String name;
+    if (difficulty is Difficulty) {
+      name = difficulty.name;
+    } else {
+      name = difficulty.toString();
+    }
+    switch (name.toLowerCase()) {
+      case 'easy':
+        return Colors.green;
+      case 'medium':
+        return Colors.orange;
+      case 'hard':
+        return Colors.red;
+      default:
+        return Colors.indigo;
+    }
   }
 
   // Common Text Styles utilizing context themes

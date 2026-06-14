@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dart_sudoku/core/sudoku_logic.dart';
+import 'package:dart_sudoku/core/difficulty.dart';
 import 'package:dart_sudoku/core/sudoku_analyzer.dart';
 
 void main() {
@@ -51,8 +52,8 @@ void main() {
     });
 
     test('generatePuzzle should generate puzzles with unique solutions', () {
-      final puzzle = SudokuLogic.generatePuzzle('easy');
-      expect(puzzle.difficulty, 'easy');
+      final puzzle = SudokuLogic.generatePuzzle(Difficulty.easy);
+      expect(puzzle.difficulty, Difficulty.easy);
 
       // Check that the puzzle grid is valid
       expect(SudokuLogic.isBoardValid(puzzle.puzzleBoard), true);
@@ -97,8 +98,12 @@ void main() {
       test('Should identify Locked Candidate (Pointing)', () {
         final board = List.generate(9, (_) => List.filled(9, 0));
         // Fill some cells in Box 0 so 1 can only go in Row 0
-        board[1][0] = 2; board[1][1] = 3; board[1][2] = 4;
-        board[2][0] = 5; board[2][1] = 6; board[2][2] = 7;
+        board[1][0] = 2;
+        board[1][1] = 3;
+        board[1][2] = 4;
+        board[2][0] = 5;
+        board[2][1] = 6;
+        board[2][2] = 7;
 
         final explanation = SudokuAnalyzer.analyzeCell(board, 0, 5, 8);
         expect(explanation.contains('Locked Candidate'), true);
@@ -113,14 +118,17 @@ void main() {
         board[0][8] = 9;
 
         // Block 1 and 4 from Col 0 and Col 1 using solved digits inside boxes
-        board[5][0] = 1; board[5][1] = 4;
-        board[8][1] = 1; board[8][0] = 4;
+        board[5][0] = 1;
+        board[5][1] = 4;
+        board[8][1] = 1;
+        board[8][0] = 4;
 
         // Block 3 from Col 2
         board[3][2] = 3;
 
         // Block 2 and 3 from Col 3
-        board[3][3] = 2; board[4][3] = 3;
+        board[3][3] = 2;
+        board[4][3] = 3;
 
         final explanation = SudokuAnalyzer.analyzeCell(board, 0, 2, 1);
         expect(explanation.contains('Naked Pair'), true);
@@ -134,12 +142,16 @@ void main() {
         board[0][7] = 1;
 
         // Block 2 and 3 from Col 2, Col 3, Col 8
-        board[3][2] = 2; board[4][2] = 3;
-        board[3][3] = 2; board[4][3] = 3;
-        board[3][8] = 2; board[4][8] = 3;
+        board[3][2] = 2;
+        board[4][2] = 3;
+        board[3][3] = 2;
+        board[4][3] = 3;
+        board[3][8] = 2;
+        board[4][8] = 3;
 
         // Block 6 from Col 0 and Col 1
-        board[3][0] = 6; board[3][1] = 6;
+        board[3][0] = 6;
+        board[3][1] = 6;
 
         // Block 5 from Col 0
         board[4][0] = 5;

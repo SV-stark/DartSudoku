@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 /// Analyzes board configurations to provide educational explanations for cell values.
 class SudokuAnalyzer {
   /// Analyzes the selected empty cell (row, col) on [currentBoard] and returns
@@ -80,7 +78,8 @@ class SudokuAnalyzer {
     });
 
     // Check for Locked Candidates (Pointing/Claiming), Naked Pairs, Hidden Pairs, X-Wings
-    String? hint = _checkLockedCandidates(currentBoard, candidates, row, col) ??
+    String? hint =
+        _checkLockedCandidates(currentBoard, candidates, row, col) ??
         _checkNakedPairs(currentBoard, candidates, row, col) ??
         _checkHiddenPairs(currentBoard, candidates, row, col) ??
         _checkXWings(currentBoard, candidates, row, col);
@@ -130,7 +129,8 @@ class SudokuAnalyzer {
               }
             }
             if (hasExternalCandidates) {
-              final isTargetAffected = targetRow == sharedRow &&
+              final isTargetAffected =
+                  targetRow == sharedRow &&
                   (targetCol < boxColStart || targetCol >= boxColStart + 3) &&
                   candidates[targetRow][targetCol].contains(d);
               if (isTargetAffected) {
@@ -154,7 +154,8 @@ class SudokuAnalyzer {
               }
             }
             if (hasExternalCandidates) {
-              final isTargetAffected = targetCol == sharedCol &&
+              final isTargetAffected =
+                  targetCol == sharedCol &&
                   (targetRow < boxRowStart || targetRow >= boxRowStart + 3) &&
                   candidates[targetRow][targetCol].contains(d);
               if (isTargetAffected) {
@@ -177,9 +178,11 @@ class SudokuAnalyzer {
         }
 
         if (rowCells.length >= 2 && rowCells.length <= 3) {
-          final firstBox = (rowCells.first.$1 ~/ 3) * 3 + (rowCells.first.$2 ~/ 3);
-          bool allInBox = rowCells.every((cell) =>
-              (cell.$1 ~/ 3) * 3 + (cell.$2 ~/ 3) == firstBox);
+          final firstBox =
+              (rowCells.first.$1 ~/ 3) * 3 + (rowCells.first.$2 ~/ 3);
+          bool allInBox = rowCells.every(
+            (cell) => (cell.$1 ~/ 3) * 3 + (cell.$2 ~/ 3) == firstBox,
+          );
 
           if (allInBox) {
             // Check if there are other cells in this box outside this row with candidate d
@@ -199,8 +202,8 @@ class SudokuAnalyzer {
             if (hasExternalCandidates) {
               final isTargetAffected =
                   (targetRow ~/ 3) * 3 + (targetCol ~/ 3) == firstBox &&
-                      targetRow != r &&
-                      candidates[targetRow][targetCol].contains(d);
+                  targetRow != r &&
+                  candidates[targetRow][targetCol].contains(d);
               if (isTargetAffected) {
                 return "Locked Candidate (Claiming Row)\n\nIn Row ${r + 1}, the number $d can only fit within Box ${firstBox + 1}. Therefore, $d can be eliminated from all other cells in Box ${firstBox + 1} outside this row.\n\nThis claiming constraint eliminates candidate $d from your selected cell!";
               }
@@ -220,9 +223,11 @@ class SudokuAnalyzer {
         }
 
         if (colCells.length >= 2 && colCells.length <= 3) {
-          final firstBox = (colCells.first.$1 ~/ 3) * 3 + (colCells.first.$2 ~/ 3);
-          bool allInBox = colCells.every((cell) =>
-              (cell.$1 ~/ 3) * 3 + (cell.$2 ~/ 3) == firstBox);
+          final firstBox =
+              (colCells.first.$1 ~/ 3) * 3 + (colCells.first.$2 ~/ 3);
+          bool allInBox = colCells.every(
+            (cell) => (cell.$1 ~/ 3) * 3 + (cell.$2 ~/ 3) == firstBox,
+          );
 
           if (allInBox) {
             // Check if there are other cells in this box outside this column with candidate d
@@ -242,8 +247,8 @@ class SudokuAnalyzer {
             if (hasExternalCandidates) {
               final isTargetAffected =
                   (targetRow ~/ 3) * 3 + (targetCol ~/ 3) == firstBox &&
-                      targetCol != c &&
-                      candidates[targetRow][targetCol].contains(d);
+                  targetCol != c &&
+                  candidates[targetRow][targetCol].contains(d);
               if (isTargetAffected) {
                 return "Locked Candidate (Claiming Column)\n\nIn Column ${c + 1}, the number $d can only fit within Box ${firstBox + 1}. Therefore, $d can be eliminated from all other cells in Box ${firstBox + 1} outside this column.\n\nThis claiming constraint eliminates candidate $d from your selected cell!";
               }
@@ -286,7 +291,8 @@ class SudokuAnalyzer {
             bool eliminates = false;
             for (int c = 0; c < 9; c++) {
               if (c != c1.$2 && c != c2.$2 && board[r][c] == 0) {
-                if (candidates[r][c].contains(d1) || candidates[r][c].contains(d2)) {
+                if (candidates[r][c].contains(d1) ||
+                    candidates[r][c].contains(d2)) {
                   eliminates = true;
                   break;
                 }
@@ -294,7 +300,8 @@ class SudokuAnalyzer {
             }
 
             if (eliminates) {
-              final isTargetAffected = targetRow == r &&
+              final isTargetAffected =
+                  targetRow == r &&
                   targetCol != c1.$2 &&
                   targetCol != c2.$2 &&
                   (candidates[targetRow][targetCol].contains(d1) ||
@@ -331,7 +338,8 @@ class SudokuAnalyzer {
             bool eliminates = false;
             for (int r = 0; r < 9; r++) {
               if (r != c1.$1 && r != c2.$1 && board[r][c] == 0) {
-                if (candidates[r][c].contains(d1) || candidates[r][c].contains(d2)) {
+                if (candidates[r][c].contains(d1) ||
+                    candidates[r][c].contains(d2)) {
                   eliminates = true;
                   break;
                 }
@@ -339,7 +347,8 @@ class SudokuAnalyzer {
             }
 
             if (eliminates) {
-              final isTargetAffected = targetCol == c &&
+              final isTargetAffected =
+                  targetCol == c &&
                   targetRow != c1.$1 &&
                   targetRow != c2.$1 &&
                   (candidates[targetRow][targetCol].contains(d1) ||
@@ -381,8 +390,11 @@ class SudokuAnalyzer {
             bool eliminates = false;
             for (int r = boxRowStart; r < boxRowStart + 3; r++) {
               for (int c = boxColStart; c < boxColStart + 3; c++) {
-                if ((r != c1.$1 || c != c1.$2) && (r != c2.$1 || c != c2.$2) && board[r][c] == 0) {
-                  if (candidates[r][c].contains(d1) || candidates[r][c].contains(d2)) {
+                if ((r != c1.$1 || c != c1.$2) &&
+                    (r != c2.$1 || c != c2.$2) &&
+                    board[r][c] == 0) {
+                  if (candidates[r][c].contains(d1) ||
+                      candidates[r][c].contains(d2)) {
                     eliminates = true;
                     break;
                   }
@@ -392,7 +404,8 @@ class SudokuAnalyzer {
 
             if (eliminates) {
               final targetBox = (targetRow ~/ 3) * 3 + (targetCol ~/ 3);
-              final isTargetAffected = targetBox == b &&
+              final isTargetAffected =
+                  targetBox == b &&
                   (targetRow != c1.$1 || targetCol != c1.$2) &&
                   (targetRow != c2.$1 || targetCol != c2.$2) &&
                   (candidates[targetRow][targetCol].contains(d1) ||
@@ -438,7 +451,8 @@ class SudokuAnalyzer {
             final extraInC2 = candidates[r][c2].length > 2;
 
             if (extraInC1 || extraInC2) {
-              final isTargetAffected = targetRow == r &&
+              final isTargetAffected =
+                  targetRow == r &&
                   (targetCol == c1 || targetCol == c2) &&
                   candidates[targetRow][targetCol].length > 2;
               if (isTargetAffected) {
@@ -473,7 +487,8 @@ class SudokuAnalyzer {
             final extraInR2 = candidates[r2][c].length > 2;
 
             if (extraInR1 || extraInR2) {
-              final isTargetAffected = targetCol == c &&
+              final isTargetAffected =
+                  targetCol == c &&
                   (targetRow == r1 || targetRow == r2) &&
                   candidates[targetRow][targetCol].length > 2;
               if (isTargetAffected) {
@@ -514,7 +529,8 @@ class SudokuAnalyzer {
             final extraInC2 = candidates[c2.$1][c2.$2].length > 2;
 
             if (extraInC1 || extraInC2) {
-              final isTargetAffected = ((targetRow == c1.$1 && targetCol == c1.$2) ||
+              final isTargetAffected =
+                  ((targetRow == c1.$1 && targetCol == c1.$2) ||
                       (targetRow == c2.$1 && targetCol == c2.$2)) &&
                   candidates[targetRow][targetCol].length > 2;
               if (isTargetAffected) {
@@ -543,11 +559,16 @@ class SudokuAnalyzer {
           final cols2 = <int>[];
 
           for (int c = 0; c < 9; c++) {
-            if (board[r1][c] == 0 && candidates[r1][c].contains(d)) cols1.add(c);
-            if (board[r2][c] == 0 && candidates[r2][c].contains(d)) cols2.add(c);
+            if (board[r1][c] == 0 && candidates[r1][c].contains(d))
+              cols1.add(c);
+            if (board[r2][c] == 0 && candidates[r2][c].contains(d))
+              cols2.add(c);
           }
 
-          if (cols1.length == 2 && cols2.length == 2 && cols1[0] == cols2[0] && cols1[1] == cols2[1]) {
+          if (cols1.length == 2 &&
+              cols2.length == 2 &&
+              cols1[0] == cols2[0] &&
+              cols1[1] == cols2[1]) {
             final c1 = cols1[0];
             final c2 = cols1[1];
 
@@ -564,7 +585,8 @@ class SudokuAnalyzer {
             }
 
             if (eliminates) {
-              final isTargetAffected = (targetCol == c1 || targetCol == c2) &&
+              final isTargetAffected =
+                  (targetCol == c1 || targetCol == c2) &&
                   targetRow != r1 &&
                   targetRow != r2 &&
                   candidates[targetRow][targetCol].contains(d);
@@ -585,11 +607,16 @@ class SudokuAnalyzer {
           final rows2 = <int>[];
 
           for (int r = 0; r < 9; r++) {
-            if (board[r][c1] == 0 && candidates[r][c1].contains(d)) rows1.add(r);
-            if (board[r][c2] == 0 && candidates[r][c2].contains(d)) rows2.add(r);
+            if (board[r][c1] == 0 && candidates[r][c1].contains(d))
+              rows1.add(r);
+            if (board[r][c2] == 0 && candidates[r][c2].contains(d))
+              rows2.add(r);
           }
 
-          if (rows1.length == 2 && rows2.length == 2 && rows1[0] == rows2[0] && rows1[1] == rows2[1]) {
+          if (rows1.length == 2 &&
+              rows2.length == 2 &&
+              rows1[0] == rows2[0] &&
+              rows1[1] == rows2[1]) {
             final r1 = rows1[0];
             final r2 = rows1[1];
 
@@ -606,7 +633,8 @@ class SudokuAnalyzer {
             }
 
             if (eliminates) {
-              final isTargetAffected = (targetRow == r1 || targetRow == r2) &&
+              final isTargetAffected =
+                  (targetRow == r1 || targetRow == r2) &&
                   targetCol != c1 &&
                   targetCol != c2 &&
                   candidates[targetRow][targetCol].contains(d);

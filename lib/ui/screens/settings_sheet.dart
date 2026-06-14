@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../providers/sudoku_provider.dart';
+import '../../providers/settings_provider.dart';
 
 /// A premium, Material 3 bottom sheet to customize gameplay assistance settings.
 class SettingsSheet extends StatelessWidget {
-  final SudokuGameProvider provider;
+  final SettingsProvider provider;
 
   const SettingsSheet({super.key, required this.provider});
 
-  static void show(BuildContext context, SudokuGameProvider provider) {
+  static void show(BuildContext context, SettingsProvider provider) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

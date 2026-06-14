@@ -151,7 +151,8 @@ void main() {
 
     // Tap start button
     await tester.tap(find.text('START BLITZ CHALLENGE'));
-    await tester.pump(); // Use pump to render first frame without waiting for periodic timer indefinitely
+    await tester
+        .pump(); // Use pump to render first frame without waiting for periodic timer indefinitely
 
     // Verify game screen components are shown
     expect(find.textContaining('Score: 0'), findsOneWidget);
@@ -269,13 +270,9 @@ void main() {
     // Setup mock shared preferences to unlock all lessons/tiers
     SharedPreferences.setMockInitialValues({
       'completed_lessons': List.generate(45, (i) => i.toString()),
-      'practice_counts': jsonEncode(
-        Map.fromIterable(
-          List.generate(45, (i) => i),
-          key: (i) => i.toString(),
-          value: (i) => 3,
-        ),
-      ),
+      'practice_counts': jsonEncode({
+        for (int i = 0; i < 45; i++) i.toString(): 3,
+      }),
     });
 
     await tester.pumpWidget(const MaterialApp(home: TutorialScreen()));

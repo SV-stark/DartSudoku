@@ -4,7 +4,8 @@ class TierDefinition {
   final String description;
   final int startLessonIndex;
   final int endLessonIndex;
-  final int requiredPractices; // Practices required of this tier to unlock the NEXT tier
+  final int
+  requiredPractices; // Practices required of this tier to unlock the NEXT tier
 
   const TierDefinition({
     required this.tierNumber,
@@ -26,7 +27,8 @@ const List<TierDefinition> appTiers = [
   TierDefinition(
     tierNumber: 1,
     name: 'Tier 1: Basics & scanning',
-    description: 'Naked/Hidden Singles, Pairs, Triples, Quads, Locked Candidates',
+    description:
+        'Naked/Hidden Singles, Pairs, Triples, Quads, Locked Candidates',
     startLessonIndex: 0,
     endLessonIndex: 11,
     requiredPractices: 3,
@@ -42,7 +44,8 @@ const List<TierDefinition> appTiers = [
   TierDefinition(
     tierNumber: 3,
     name: 'Tier 3: Wing Strategies',
-    description: 'Skyscraper, Two-String-Kite, Crane, Empty Rectangle, Y-Wing, XYZ-Wing, W-Wing',
+    description:
+        'Skyscraper, Two-String-Kite, Crane, Empty Rectangle, Y-Wing, XYZ-Wing, W-Wing',
     startLessonIndex: 22,
     endLessonIndex: 29,
     requiredPractices: 3,
@@ -50,7 +53,8 @@ const List<TierDefinition> appTiers = [
   TierDefinition(
     tierNumber: 4,
     name: 'Tier 4: Chaining & Uniqueness',
-    description: 'Simple Coloring, X-Chain, XY-Chain, AIC, Forcing Chains, Unique Rectangles, BUG',
+    description:
+        'Simple Coloring, X-Chain, XY-Chain, AIC, Forcing Chains, Unique Rectangles, BUG',
     startLessonIndex: 30,
     endLessonIndex: 44,
     requiredPractices: 0,

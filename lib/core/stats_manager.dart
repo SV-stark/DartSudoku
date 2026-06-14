@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/prefs_keys.dart';
+import 'difficulty.dart';
 
 /// Represents a single best time record with a date.
 class TimeRecord {
@@ -118,17 +120,30 @@ class GameStats {
 /// Helper class to load/save stats in persistent storage.
 class StatsManager {
   static const String _key = PrefsKeys.stats;
+  static SharedPreferences? _prefs;
+
+  static Future<SharedPreferences> _getPrefs() async {
+    if (_prefs != null) return _prefs!;
+    _prefs = await SharedPreferences.getInstance();
+    return _prefs!;
+  }
+
+  @visibleForTesting
+  static void resetCache() {
+    _prefs = null;
+  }
 
   /// Load all game stats from SharedPreferences
   static Future<GameStats> getStats() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final data = prefs.getString(_key);
       if (data == null) {
         return GameStats.defaultStats();
       }
       return GameStats.fromJson(jsonDecode(data));
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('Error getting stats in StatsManager: $e\n$stack');
       return GameStats.defaultStats();
     }
   }
@@ -136,22 +151,24 @@ class StatsManager {
   /// Save game stats to SharedPreferences
   static Future<void> saveStats(GameStats stats) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.setString(_key, jsonEncode(stats.toJson()));
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('Error saving stats in StatsManager: $e\n$stack');
+    }
   }
 
   /// Increment played games for a difficulty level
-  static Future<void> recordGameStart(String difficulty) async {
+  static Future<void> recordGameStart(Difficulty difficulty) async {
     final stats = await getStats();
-    stats.difficultyStats[difficulty.toLowerCase()]?.gamesPlayed++;
+    stats.difficultyStats[difficulty.name]?.gamesPlayed++;
     await saveStats(stats);
   }
 
   /// Increment won games, update best/total time, and update win streaks
-  static Future<void> recordGameWin(String difficulty, int seconds) async {
+  static Future<void> recordGameWin(Difficulty difficulty, int seconds) async {
     final stats = await getStats();
-    final diff = difficulty.toLowerCase();
+    final diff = difficulty.name;
     final diffStats = stats.difficultyStats[diff]!;
 
     diffStats.gamesWon++;
@@ -205,8 +222,10 @@ class StatsManager {
   /// Clear all stats history
   static Future<void> resetStats() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.remove(_key);
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('Error resetting stats in StatsManager: $e\n$stack');
+    }
   }
 }

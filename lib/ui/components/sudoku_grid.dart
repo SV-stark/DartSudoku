@@ -186,7 +186,7 @@ class SudokuGrid extends StatelessWidget {
       button: true,
       selected: isSelected,
       child: GestureDetector(
-        key: Key('cell_${r}_${c}'),
+        key: Key('cell_${r}_$c'),
         onTap: () => onCellTap(r, c),
         behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
@@ -212,7 +212,10 @@ class SudokuGrid extends StatelessWidget {
                       transitionBuilder: (child, animation) {
                         return ScaleTransition(
                           scale: animation,
-                          child: FadeTransition(opacity: animation, child: child),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
                         );
                       },
                       child: Text(
@@ -294,14 +297,14 @@ class _GridTheme {
   final Color errorText;
 
   _GridTheme(BuildContext context)
-      : colorScheme = Theme.of(context).colorScheme,
-        outline = Theme.of(context).colorScheme.outline,
-        outlineVariant = Theme.of(context).colorScheme.outlineVariant,
-        selectedCellBg = AppTheme.selectedCellBg(context),
-        sameNumberBg = AppTheme.sameNumberBg(context),
-        relatedCellBg = AppTheme.relatedCellBg(context),
-        clueText = AppTheme.clueText(context),
-        userText = AppTheme.userText(context),
-        noteText = AppTheme.noteText(context),
-        errorText = AppTheme.errorText(context);
+    : colorScheme = Theme.of(context).colorScheme,
+      outline = Theme.of(context).colorScheme.outline,
+      outlineVariant = Theme.of(context).colorScheme.outlineVariant,
+      selectedCellBg = AppTheme.selectedCellBg(context),
+      sameNumberBg = AppTheme.sameNumberBg(context),
+      relatedCellBg = AppTheme.relatedCellBg(context),
+      clueText = AppTheme.clueText(context),
+      userText = AppTheme.userText(context),
+      noteText = AppTheme.noteText(context),
+      errorText = AppTheme.errorText(context);
 }
