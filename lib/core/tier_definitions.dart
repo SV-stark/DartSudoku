@@ -57,6 +57,15 @@ const List<TierDefinition> appTiers = [
         'Simple Coloring, X-Chain, XY-Chain, AIC, Forcing Chains, Unique Rectangles, BUG',
     startLessonIndex: 30,
     endLessonIndex: 44,
+    requiredPractices: 3,
+  ),
+  TierDefinition(
+    tierNumber: 5,
+    name: 'Tier 5: ALS & Advanced Geometry',
+    description:
+        'Almost Locked Sets (ALS-XZ, ALS-XY-Wing, Death Blossom), Advanced Uniqueness (UR Type 6, Avoidable Rectangle), Sue de Coq, Exocet',
+    startLessonIndex: 45,
+    endLessonIndex: 51,
     requiredPractices: 0,
   ),
 ];

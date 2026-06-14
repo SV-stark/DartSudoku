@@ -2435,6 +2435,360 @@ class SudokuLessonsData {
           ),
         ],
       ),
+
+      // 45. ALS-XZ
+      LessonData(
+        title: 'ALS-XZ',
+        slides: [
+          SlideData(
+            text:
+                'An Almost Locked Set (ALS) is a set of N cells in a house with N+1 candidates. In ALS-XZ, two ALSs share a restricted common candidate X and a target common candidate Z. Z can be eliminated from any cell seeing all Z cells in both sets.',
+            board: emptyBoard(),
+            highlightedRow: 0,
+            highlightedCol: 4,
+            notes: {
+              '0,0': {1, 2, 3}, // ALS A (Row 1)
+              '0,1': {1, 2, 3}, // ALS A (Row 1)
+              '0,7': {1, 2, 4}, // ALS B (Row 1)
+              '0,8': {1, 2, 4}, // ALS B (Row 1)
+              '0,4': {2, 9},    // Target (Row 1 Col 5 sees all)
+            },
+            customHighlights: (context) => {
+              '0,0': helperColor,
+              '0,1': helperColor,
+              '0,7': helperColor,
+              '0,8': helperColor,
+              '0,4': alertColor,
+            },
+          ),
+          SlideData(
+            text:
+                'With ALS A {1,2,3} and ALS B {1,2,4}, the common candidate 1 is restricted to Row 1. This forces candidate 2 into either ALS A or ALS B. Row 1 Col 5 sees both, so 2 is eliminated. Input 9.',
+            board: emptyBoard(),
+            highlightedRow: 0,
+            highlightedCol: 4,
+            notes: {
+              '0,0': {1, 2, 3},
+              '0,1': {1, 2, 3},
+              '0,7': {1, 2, 4},
+              '0,8': {1, 2, 4},
+            },
+            expectedValue: 9,
+            interactiveHelp:
+                'Since 1 is the restricted common candidate, 2 must occupy one of the ALSs, eliminating 2 from Row 1 Col 5.',
+            customHighlights: (context) => {
+              '0,0': helperColor,
+              '0,1': helperColor,
+              '0,7': helperColor,
+              '0,8': helperColor,
+              '0,4': targetColor,
+            },
+          ),
+        ],
+      ),
+
+      // 46. ALS-XY-Wing
+      LessonData(
+        title: 'ALS-XY-Wing',
+        slides: [
+          SlideData(
+            text:
+                'ALS-XY-Wing links three ALSs: a pivot ALS A sharing X and Y with pincers B and C. This eliminates candidate Z from any cell seeing all Z cells in both pincers B and C.',
+            board: emptyBoard(),
+            highlightedRow: 4,
+            highlightedCol: 4,
+            notes: {
+              '0,0': {1, 2},    // Pivot A (trivial ALS)
+              '0,4': {1, 3, 5}, // Pincer B (Row 1 Col 5)
+              '1,4': {1, 3, 5}, // Pincer B (Row 2 Col 5)
+              '4,0': {2, 3},    // Pincer C (Row 5 Col 1)
+              '4,4': {3, 8},    // Target (Row 5 Col 5 sees B and C)
+            },
+            customHighlights: (context) => {
+              '0,0': helperColor,
+              '0,4': helperColor,
+              '1,4': helperColor,
+              '4,0': helperColor,
+              '4,4': alertColor,
+            },
+          ),
+          SlideData(
+            text:
+                'Pivot A {1,2} links to Pincer B {1,3,5} and C {2,3}. Since 3 must exist in either Pincer B or C, candidate 3 is eliminated from Row 5 Col 5 (which sees all 3s in B and C). Input 8.',
+            board: emptyBoard(),
+            highlightedRow: 4,
+            highlightedCol: 4,
+            notes: {
+              '0,0': {1, 2},
+              '0,4': {1, 3, 5},
+              '1,4': {1, 3, 5},
+              '4,0': {2, 3},
+            },
+            expectedValue: 8,
+            interactiveHelp:
+                'ALS-XY-Wing forces candidate 3 into either Pincer B or Pincer C, eliminating 3 from Row 5 Col 5.',
+            customHighlights: (context) => {
+              '0,0': helperColor,
+              '0,4': helperColor,
+              '1,4': helperColor,
+              '4,0': helperColor,
+              '4,4': targetColor,
+            },
+          ),
+        ],
+      ),
+
+      // 47. Death Blossom
+      LessonData(
+        title: 'Death Blossom',
+        slides: [
+          SlideData(
+            text:
+                'Death Blossom begins with a pivot cell. Each candidate of the pivot cell links to a different ALS that eliminates candidate Z. Thus, Z can be eliminated from any cell seeing all Z cells in all the ALSs.',
+            board: emptyBoard(),
+            highlightedRow: 4,
+            highlightedCol: 4,
+            notes: {
+              '0,0': {1, 2},    // Pivot cell
+              '0,4': {1, 3, 5}, // ALS 1 (Col 5)
+              '1,4': {1, 3, 5}, // ALS 1 (Col 5)
+              '4,0': {2, 3, 6}, // ALS 2 (Row 5)
+              '4,1': {2, 3, 6}, // ALS 2 (Row 5)
+              '4,4': {3, 7},    // Target (Row 5 Col 5 sees all 3s)
+            },
+            customHighlights: (context) => {
+              '0,0': helperColor,
+              '0,4': helperColor,
+              '1,4': helperColor,
+              '4,0': helperColor,
+              '4,1': helperColor,
+              '4,4': alertColor,
+            },
+          ),
+          SlideData(
+            text:
+                'Pivot {1,2} forces either ALS 1 or ALS 2 to lock. In either case, candidate 3 must be true in one of the sets. Cell Row 5 Col 5 sees all 3s in both sets and is eliminated. Input 7.',
+            board: emptyBoard(),
+            highlightedRow: 4,
+            highlightedCol: 4,
+            notes: {
+              '0,0': {1, 2},
+              '0,4': {1, 3, 5},
+              '1,4': {1, 3, 5},
+              '4,0': {2, 3, 6},
+              '4,1': {2, 3, 6},
+            },
+            expectedValue: 7,
+            interactiveHelp:
+                'Death Blossom shows that regardless of the value of the pivot cell, candidate 3 is forced into ALS 1 or ALS 2, eliminating 3 from Row 5 Col 5.',
+            customHighlights: (context) => {
+              '0,0': helperColor,
+              '0,4': helperColor,
+              '1,4': helperColor,
+              '4,0': helperColor,
+              '4,1': helperColor,
+              '4,4': targetColor,
+            },
+          ),
+        ],
+      ),
+
+      // 48. Unique Rectangle Type 6
+      LessonData(
+        title: 'Unique Rectangle Type 6',
+        slides: [
+          SlideData(
+            text:
+                'In a Unique Rectangle of cells, if candidate A is restricted in its rows and columns to only the rectangle, we can eliminate A from the two diagonal cells to avoid a deadly loop.',
+            board: emptyBoard(),
+            highlightedRow: 2,
+            highlightedCol: 7,
+            notes: {
+              '0,1': {3, 8},    // UR cell (Row 1 Col 2)
+              '0,7': {3, 8},    // UR cell (Row 1 Col 8)
+              '2,1': {3, 8, 5}, // UR cell (Row 3 Col 2)
+              '2,7': {3, 5},    // UR cell (Row 3 Col 8)
+            },
+            customHighlights: (context) => {
+              '0,1': helperColor,
+              '0,7': helperColor,
+              '2,1': helperColor,
+              '2,7': alertColor,
+            },
+          ),
+          SlideData(
+            text:
+                'Candidate 3 is restricted in Row 1 and Row 3 to the rectangle. Eliminating 3 from the diagonal cells R1C2 and R3C8 avoids the deadly {3,8} loop. Input 5.',
+            board: emptyBoard(),
+            highlightedRow: 2,
+            highlightedCol: 7,
+            notes: {
+              '0,1': {3, 8},
+              '0,7': {3, 8},
+              '2,1': {3, 8, 5},
+            },
+            expectedValue: 5,
+            interactiveHelp:
+                'To avoid a non-unique deadly loop of {3, 8}, candidate 3 is eliminated from Row 3 Col 8, leaving only 5.',
+            customHighlights: (context) => {
+              '0,1': helperColor,
+              '0,7': helperColor,
+              '2,1': helperColor,
+              '2,7': targetColor,
+            },
+          ),
+        ],
+      ),
+
+      // 49. Avoidable Rectangle
+      LessonData(
+        title: 'Avoidable Rectangle',
+        slides: [
+          SlideData(
+            text:
+                'An Avoidable Rectangle uses already-solved cells of a rectangle to eliminate candidates that would form a non-unique deadly pattern.',
+            board: boardWith({
+              '0,1': 3, // Solved cell (Row 1 Col 2)
+              '0,7': 8, // Solved cell (Row 1 Col 8)
+              '2,1': 8, // Solved cell (Row 3 Col 2)
+            }),
+            highlightedRow: 2,
+            highlightedCol: 7,
+            notes: {
+              '2,7': {3, 8, 5}, // Target cell
+            },
+            customHighlights: (context) => {
+              '0,1': helperColor,
+              '0,7': helperColor,
+              '2,1': helperColor,
+              '2,7': alertColor,
+            },
+          ),
+          SlideData(
+            text:
+                'If Row 3 Col 8 were 3, it would form a deadly {3,8} loop with the solved cells. Thus, candidate 3 is eliminated, forcing Row 3 Col 8 to be 5. Input 5.',
+            board: boardWith({
+              '0,1': 3,
+              '0,7': 8,
+              '2,1': 8,
+            }),
+            highlightedRow: 2,
+            highlightedCol: 7,
+            notes: {},
+            expectedValue: 5,
+            interactiveHelp:
+                'Entering 3 would create a deadly pattern of {3, 8} with the pre-solved cells, so Row 3 Col 8 must be 5.',
+            customHighlights: (context) => {
+              '0,1': helperColor,
+              '0,7': helperColor,
+              '2,1': helperColor,
+              '2,7': targetColor,
+            },
+          ),
+        ],
+      ),
+
+      // 50. Sue de Coq
+      LessonData(
+        title: 'Sue de Coq',
+        slides: [
+          SlideData(
+            text:
+                'Sue de Coq uses an intersection of a box and line. If intersection cells and external line/box cells have candidates that form a locked set, we can eliminate those candidates from all other cells in the house.',
+            board: emptyBoard(),
+            highlightedRow: 0,
+            highlightedCol: 7,
+            notes: {
+              '0,1': {1, 2, 3, 4}, // Intersection cell (Row 1 Col 2)
+              '0,2': {1, 2, 3, 4}, // Intersection cell (Row 1 Col 3)
+              '1,1': {1, 2},       // Box-only cell (Row 2 Col 2)
+              '0,4': {3, 4},       // Line-only cell (Row 1 Col 5)
+              '0,7': {3, 9},       // Target cell (Row 1 Col 8)
+            },
+            customHighlights: (context) => {
+              '0,1': boxColor,
+              '0,2': boxColor,
+              '1,1': helperColor,
+              '0,4': helperColor,
+              '0,7': alertColor,
+            },
+          ),
+          SlideData(
+            text:
+                'The union of cells R1C2, R1C3, R2C2, and R1C5 contains candidates {1,2,3,4}. This locks {3,4} in Row 1, eliminating 3 from Row 1 Col 8. Input 9.',
+            board: emptyBoard(),
+            highlightedRow: 0,
+            highlightedCol: 7,
+            notes: {
+              '0,1': {1, 2, 3, 4},
+              '0,2': {1, 2, 3, 4},
+              '1,1': {1, 2},
+              '0,4': {3, 4},
+            },
+            expectedValue: 9,
+            interactiveHelp:
+                'Sue de Coq locks candidates 3 and 4 within Row 1, eliminating 3 from Row 1 Col 8.',
+            customHighlights: (context) => {
+              '0,1': boxColor,
+              '0,2': boxColor,
+              '1,1': helperColor,
+              '0,4': helperColor,
+              '0,7': targetColor,
+            },
+          ),
+        ],
+      ),
+
+      // 51. Exocet (Junior/Senior)
+      LessonData(
+        title: 'Exocet (Junior/Senior)',
+        slides: [
+          SlideData(
+            text:
+                'An Exocet pattern features a double-cell base in one box and two target cells in another box. Base candidates are locked to base/target cells, eliminating them from other cells in their rows/columns.',
+            board: emptyBoard(),
+            highlightedRow: 0,
+            highlightedCol: 4,
+            notes: {
+              '0,0': {1, 2}, // Base cell (Row 1 Col 1)
+              '1,0': {1, 2}, // Base cell (Row 2 Col 1)
+              '0,8': {1, 2}, // Target cell (Row 1 Col 9)
+              '1,8': {1, 2}, // Target cell (Row 2 Col 9)
+              '0,4': {2, 6}, // Target cell (Row 1 Col 5)
+            },
+            customHighlights: (context) => {
+              '0,0': helperColor,
+              '1,0': helperColor,
+              '0,8': helperColor,
+              '1,8': helperColor,
+              '0,4': alertColor,
+            },
+          ),
+          SlideData(
+            text:
+                'With exocet base {1,2} and targets at R1C9/R2C9, the candidate 2 is locked and cannot be placed elsewhere in Row 1. This eliminates 2 from Row 1 Col 5. Input 6.',
+            board: emptyBoard(),
+            highlightedRow: 0,
+            highlightedCol: 4,
+            notes: {
+              '0,0': {1, 2},
+              '1,0': {1, 2},
+              '0,8': {1, 2},
+              '1,8': {1, 2},
+            },
+            expectedValue: 6,
+            interactiveHelp:
+                'The Exocet pattern locks base value 2, eliminating candidate 2 from Row 1 Col 5.',
+            customHighlights: (context) => {
+              '0,0': helperColor,
+              '1,0': helperColor,
+              '0,8': helperColor,
+              '1,8': helperColor,
+              '0,4': targetColor,
+            },
+          ),
+        ],
+      ),
     ];
   }
 }

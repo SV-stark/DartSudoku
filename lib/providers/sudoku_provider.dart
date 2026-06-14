@@ -7,6 +7,7 @@ import '../core/sudoku_logic.dart';
 import '../core/stats_manager.dart';
 import '../core/difficulty.dart';
 import '../core/constants.dart';
+import '../core/sudoku_analyzer.dart';
 import '../data/prefs_keys.dart';
 import 'settings_provider.dart';
 
@@ -678,21 +679,30 @@ class SudokuSolverProvider extends ChangeNotifier {
   int _selectedCol = -1;
   SolverStatus _status = SolverStatus.idle;
   String? _errorMessage;
+  int _flashRow = -1;
+  int _flashCol = -1;
+  String? _stepExplanation;
+  Timer? _flashTimer;
 
   List<List<int>> get solverBoard => _solverBoard;
   int get selectedRow => _selectedRow;
   int get selectedCol => _selectedCol;
   SolverStatus get status => _status;
   String? get errorMessage => _errorMessage;
+  int get flashRow => _flashRow;
+  int get flashCol => _flashCol;
+  String? get stepExplanation => _stepExplanation;
 
   void selectCell(int r, int c) {
     _selectedRow = r;
     _selectedCol = c;
+    _stepExplanation = null;
     if (_errorMessage != null) {
       _errorMessage = null;
       notifyListeners();
     } else {
       selectionNotifier.notifyListeners();
+      notifyListeners();
     }
   }
 
@@ -701,6 +711,7 @@ class SudokuSolverProvider extends ChangeNotifier {
     _solverBoard[_selectedRow][_selectedCol] = number;
     _status = SolverStatus.idle;
     _errorMessage = null;
+    _stepExplanation = null;
     notifyListeners();
   }
 
@@ -709,6 +720,7 @@ class SudokuSolverProvider extends ChangeNotifier {
     _solverBoard[_selectedRow][_selectedCol] = 0;
     _status = SolverStatus.idle;
     _errorMessage = null;
+    _stepExplanation = null;
     notifyListeners();
   }
 
@@ -721,12 +733,26 @@ class SudokuSolverProvider extends ChangeNotifier {
     _selectedCol = -1;
     _status = SolverStatus.idle;
     _errorMessage = null;
+    _stepExplanation = null;
     notifyListeners();
+  }
+
+  void triggerFlash(int r, int c) {
+    _flashTimer?.cancel();
+    _flashRow = r;
+    _flashCol = c;
+    notifyListeners();
+    _flashTimer = Timer(const Duration(milliseconds: 600), () {
+      _flashRow = -1;
+      _flashCol = -1;
+      notifyListeners();
+    });
   }
 
   /// 1st way: Complete solve of the board.
   void solveComplete() {
     _errorMessage = null;
+    _stepExplanation = null;
 
     // Check general rules validity of the current user inputs
     if (!SudokuLogic.isBoardValid(_solverBoard)) {
@@ -758,6 +784,7 @@ class SudokuSolverProvider extends ChangeNotifier {
   /// 2nd way: Solve only the selected cell.
   void solveSelectedCell() {
     _errorMessage = null;
+    _stepExplanation = null;
 
     if (_selectedRow == -1 || _selectedCol == -1) {
       _status = SolverStatus.error;
@@ -791,6 +818,7 @@ class SudokuSolverProvider extends ChangeNotifier {
       _solverBoard[_selectedRow][_selectedCol] = solvedVal;
       _status =
           SolverStatus.idle; // return to idle so they can solve more cells
+      triggerFlash(_selectedRow, _selectedCol);
     } else {
       _status = SolverStatus.error;
       _errorMessage =
@@ -799,8 +827,98 @@ class SudokuSolverProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 3rd way: Solve stepwise, solving one cell at a time and explaining the technique.
+  void solveStepWise() {
+    _errorMessage = null;
+    _stepExplanation = null;
+
+    // Check general rules validity of the current user inputs
+    if (!SudokuLogic.isBoardValid(_solverBoard)) {
+      _status = SolverStatus.error;
+      _errorMessage =
+          "The grid contains rule violations (duplicate numbers in rows, columns, or 3x3 grids)!";
+      notifyListeners();
+      return;
+    }
+
+    // Check if the board is already completely solved
+    bool isComplete = true;
+    for (int r = 0; r < GameConstants.boardSize; r++) {
+      for (int c = 0; c < GameConstants.boardSize; c++) {
+        if (_solverBoard[r][c] == 0) {
+          isComplete = false;
+          break;
+        }
+      }
+      if (!isComplete) break;
+    }
+
+    if (isComplete) {
+      _status = SolverStatus.error;
+      _errorMessage = "The board is already fully solved!";
+      notifyListeners();
+      return;
+    }
+
+    _status = SolverStatus.solving;
+    notifyListeners();
+
+    // Create a copy to solve
+    List<List<int>> solvedCopy = SudokuLogic.copyBoard(_solverBoard);
+    bool success = SudokuLogic.solve(solvedCopy);
+
+    if (success) {
+      // Find the cell with the fewest candidates (MRV heuristic)
+      int targetRow = -1;
+      int targetCol = -1;
+      int minOptions = 10;
+
+      for (int r = 0; r < GameConstants.boardSize; r++) {
+        for (int c = 0; c < GameConstants.boardSize; c++) {
+          if (_solverBoard[r][c] == 0) {
+            int options = 0;
+            for (int val = 1; val <= 9; val++) {
+              if (SudokuLogic.isValid(_solverBoard, r, c, val)) {
+                options++;
+              }
+            }
+            if (options < minOptions) {
+              minOptions = options;
+              targetRow = r;
+              targetCol = c;
+            }
+          }
+        }
+      }
+
+      if (targetRow != -1 && targetCol != -1) {
+        int solvedVal = solvedCopy[targetRow][targetCol];
+        _stepExplanation = SudokuAnalyzer.analyzeCell(
+          _solverBoard,
+          targetRow,
+          targetCol,
+          solvedVal,
+        );
+        _solverBoard[targetRow][targetCol] = solvedVal;
+        _selectedRow = targetRow;
+        _selectedCol = targetCol;
+        _status = SolverStatus.idle;
+        triggerFlash(targetRow, targetCol);
+      } else {
+        _status = SolverStatus.error;
+        _errorMessage = "Could not find a cell to solve.";
+      }
+    } else {
+      _status = SolverStatus.error;
+      _errorMessage =
+          "This Sudoku layout is unsolvable. Please check your entered values.";
+    }
+    notifyListeners();
+  }
+
   @override
   void dispose() {
+    _flashTimer?.cancel();
     selectionNotifier.dispose();
     super.dispose();
   }

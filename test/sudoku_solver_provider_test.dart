@@ -152,5 +152,105 @@ void main() {
       }
       expect(filledCount, 4); // 3 original + 1 solved cell
     });
+
+    test('solveStepWise solves a single cell at a time and provides explanation', () {
+      final provider = SudokuSolverProvider();
+      provider.selectCell(0, 0);
+      provider.enterNumber(5);
+      provider.selectCell(0, 1);
+      provider.enterNumber(3);
+      provider.selectCell(0, 4);
+      provider.enterNumber(7);
+
+      provider.solveStepWise();
+
+      expect(provider.status, SolverStatus.idle);
+      expect(provider.stepExplanation, isNotNull);
+      expect(provider.stepExplanation, isNotEmpty);
+      expect(provider.flashRow, isNot(-1));
+      expect(provider.flashCol, isNot(-1));
+
+      // Check that exactly 4 cells are now filled (3 original + 1 solved stepwise)
+      int filledCount = 0;
+      for (int r = 0; r < 9; r++) {
+        for (int c = 0; c < 9; c++) {
+          if (provider.solverBoard[r][c] != 0) {
+            filledCount++;
+          }
+        }
+      }
+      expect(filledCount, 4);
+    });
+
+    test('solveStepWise handles invalid layout duplicate rule violations', () {
+      final provider = SudokuSolverProvider();
+      provider.selectCell(0, 0);
+      provider.enterNumber(5);
+      provider.selectCell(0, 1);
+      provider.enterNumber(5); // Conflict in row 0
+
+      provider.solveStepWise();
+      expect(provider.status, SolverStatus.error);
+      expect(provider.errorMessage, contains('violations'));
+    });
+
+    test('solveStepWise handles unsolvable board configurations', () {
+      final provider = SudokuSolverProvider();
+      provider.selectCell(0, 1);
+      provider.enterNumber(2);
+      provider.selectCell(0, 2);
+      provider.enterNumber(3);
+      provider.selectCell(0, 3);
+      provider.enterNumber(4);
+      provider.selectCell(0, 4);
+      provider.enterNumber(5);
+      provider.selectCell(0, 5);
+      provider.enterNumber(6);
+      provider.selectCell(0, 6);
+      provider.enterNumber(7);
+      provider.selectCell(0, 7);
+      provider.enterNumber(8);
+      provider.selectCell(0, 8);
+      provider.enterNumber(9);
+      provider.selectCell(8, 0);
+      provider.enterNumber(1);
+
+      provider.solveStepWise();
+      expect(provider.status, SolverStatus.error);
+      expect(provider.errorMessage, contains('unsolvable'));
+    });
+
+    test('solveStepWise handles already completed boards', () {
+      final provider = SudokuSolverProvider();
+      // Solve a valid puzzle completely first
+      provider.selectCell(0, 0);
+      provider.enterNumber(5);
+      provider.selectCell(0, 1);
+      provider.enterNumber(3);
+      provider.selectCell(0, 4);
+      provider.enterNumber(7);
+      provider.selectCell(1, 0);
+      provider.enterNumber(6);
+      provider.selectCell(1, 3);
+      provider.enterNumber(1);
+      provider.selectCell(1, 4);
+      provider.enterNumber(9);
+      provider.selectCell(1, 5);
+      provider.enterNumber(5);
+      provider.selectCell(2, 1);
+      provider.enterNumber(9);
+      provider.selectCell(2, 2);
+      provider.enterNumber(8);
+      provider.selectCell(2, 7);
+      provider.enterNumber(6);
+
+      provider.solveComplete();
+      expect(provider.status, SolverStatus.solved);
+
+      // Now call solveStepWise
+      provider.solveStepWise();
+      expect(provider.status, SolverStatus.error);
+      expect(provider.errorMessage, contains('already fully solved'));
+    });
   });
 }

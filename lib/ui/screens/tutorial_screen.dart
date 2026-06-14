@@ -468,6 +468,8 @@ class _TutorialScreenState extends State<TutorialScreen>
       'Wings (Y-Wing / W-Wing)': [22, 23, 24, 25, 26, 27, 28, 29],
       'Chaining Techniques': [30, 31, 32, 33, 34, 35, 36, 37, 38],
       'Uniqueness Techniques': [39, 40, 41, 42, 43, 44],
+      'Almost Locked Set (ALS)': [45, 46, 47],
+      'Advanced Uniqueness & Geometry': [48, 49, 50, 51],
     };
 
     showModalBottomSheet(
@@ -1935,6 +1937,17 @@ class _TutorialScreenState extends State<TutorialScreen>
       }
       return tier3PracticeCount < 3;
     }
+    if (tier == 5) {
+      if (_isTierLocked(4)) return true;
+      for (int i = 30; i <= 44; i++) {
+        if (!_completedLessons.contains(i)) return true;
+      }
+      int tier4PracticeCount = 0;
+      for (int i = 30; i <= 44; i++) {
+        tier4PracticeCount += _practiceCounts[i] ?? 0;
+      }
+      return tier4PracticeCount < 3;
+    }
     return false;
   }
 
@@ -1942,7 +1955,8 @@ class _TutorialScreenState extends State<TutorialScreen>
     if (lessonIndex <= 11) return 1;
     if (lessonIndex <= 21) return 2;
     if (lessonIndex <= 29) return 3;
-    return 4;
+    if (lessonIndex <= 44) return 4;
+    return 5;
   }
 
   bool _isLessonLocked(int lessonIndex) =>
@@ -1950,7 +1964,7 @@ class _TutorialScreenState extends State<TutorialScreen>
 
   int _pickRandomUnlockedLesson() {
     final unlocked = <int>[];
-    for (int i = 0; i < 45; i++) {
+    for (int i = 0; i < 52; i++) {
       if (!_isLessonLocked(i)) {
         unlocked.add(i);
       }
@@ -2153,7 +2167,7 @@ class _TutorialScreenState extends State<TutorialScreen>
                           _buildStatDisplay(
                             context,
                             'UNLOCKED TECHNIQUES',
-                            '${_countUnlockedLessons()}/45',
+                            '${_countUnlockedLessons()}/52',
                             Icons.lock_open_rounded,
                             theme.colorScheme.primary,
                           ),
@@ -2603,7 +2617,7 @@ class _TutorialScreenState extends State<TutorialScreen>
 
   int _countUnlockedLessons() {
     int count = 0;
-    for (int i = 0; i < 45; i++) {
+    for (int i = 0; i < 52; i++) {
       if (!_isLessonLocked(i)) count++;
     }
     return count;
@@ -2805,12 +2819,14 @@ class _TutorialScreenState extends State<TutorialScreen>
     int tier2Count = 0;
     int tier3Count = 0;
     int tier4Count = 0;
+    int tier5Count = 0;
     for (int idx in _completedLessons) {
       final t = _getLessonTier(idx);
       if (t == 1) tier1Count++;
       if (t == 2) tier2Count++;
       if (t == 3) tier3Count++;
       if (t == 4) tier4Count++;
+      if (t == 5) tier5Count++;
     }
 
     String advice =
@@ -2889,7 +2905,7 @@ class _TutorialScreenState extends State<TutorialScreen>
                                   style: TextStyle(fontSize: 10),
                                 ),
                                 Text(
-                                  '$completedCount / 45',
+                                  '$completedCount / 52',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
@@ -3021,6 +3037,12 @@ class _TutorialScreenState extends State<TutorialScreen>
                     'Tier 4: Chaining & Uniqueness',
                     tier4Count,
                     15,
+                    theme,
+                  ),
+                  _buildTierProgressBar(
+                    'Tier 5: ALS & Advanced Geometry',
+                    tier5Count,
+                    7,
                     theme,
                   ),
                   const SizedBox(height: 20),

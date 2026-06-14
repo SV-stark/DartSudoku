@@ -166,7 +166,7 @@ class _SolverScreenState extends State<SolverScreen> {
                   context,
                   number: '3',
                   text:
-                      'Choose your solving method:\n• Solve Complete: Solves all empty cells on the grid.\n• Solve Selected: Computes the solution and fills in ONLY the selected square.',
+                      'Choose your solving method:\n• Solve Complete: Solves all empty cells on the grid.\n• Solve Step: Solves one cell at a time and explains the technique used.\n• Solve Selected: Computes the solution and fills in ONLY the selected square.',
                 ),
               ],
             ),
@@ -254,6 +254,8 @@ class _SolverScreenState extends State<SolverScreen> {
                       board: _provider.solverBoard,
                       selectedRow: _provider.selectedRow,
                       selectedCol: _provider.selectedCol,
+                      flashRow: _provider.flashRow,
+                      flashCol: _provider.flashCol,
                       onCellTap: (r, c) {
                         _provider.selectCell(r, c);
                       },
@@ -279,6 +281,10 @@ class _SolverScreenState extends State<SolverScreen> {
                     if (_provider.errorMessage != null) ...[
                       const SizedBox(height: 12),
                       _buildErrorDisplay(),
+                    ],
+                    if (_provider.stepExplanation != null) ...[
+                      const SizedBox(height: 12),
+                      _buildStepExplanationDisplay(),
                     ],
                     const SizedBox(height: 16),
                     _buildSolverActionButtons(),
@@ -317,6 +323,8 @@ class _SolverScreenState extends State<SolverScreen> {
                         board: _provider.solverBoard,
                         selectedRow: _provider.selectedRow,
                         selectedCol: _provider.selectedCol,
+                        flashRow: _provider.flashRow,
+                        flashCol: _provider.flashCol,
                         onCellTap: (r, c) {
                           _provider.selectCell(r, c);
                         },
@@ -330,6 +338,10 @@ class _SolverScreenState extends State<SolverScreen> {
               if (_provider.errorMessage != null) ...[
                 const SizedBox(height: 12),
                 _buildErrorDisplay(),
+              ],
+              if (_provider.stepExplanation != null) ...[
+                const SizedBox(height: 12),
+                _buildStepExplanationDisplay(),
               ],
 
               const SizedBox(height: 20),
@@ -500,45 +512,49 @@ class _SolverScreenState extends State<SolverScreen> {
       children: [
         Row(
           children: [
-            // Solve Complete Button (Material 3 Filled Button)
+            // Solve Complete Button
             Expanded(
-              child: FilledButton(
+              child: FilledButton.icon(
                 onPressed: _provider.status == SolverStatus.solving
                     ? null
                     : _provider.solveComplete,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
+                icon: const Icon(Icons.bolt_rounded, size: 18),
+                label: const Text(
                   'SOLVE COMPLETE',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
+                    fontSize: 12,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            // Solve Selected Cell Button (Material 3 Filled Tonal Button)
+            // Solve Step Button
             Expanded(
-              child: FilledButton.tonal(
+              child: FilledButton.tonalIcon(
                 onPressed: _provider.status == SolverStatus.solving
                     ? null
-                    : _provider.solveSelectedCell,
+                    : _provider.solveStepWise,
+                icon: const Icon(Icons.skip_next_rounded, size: 18),
+                label: const Text(
+                  'SOLVE STEP',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                    fontSize: 12,
+                  ),
+                ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'SOLVE SELECTED',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
                   ),
                 ),
               ),
@@ -546,24 +562,111 @@ class _SolverScreenState extends State<SolverScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        // Clear Board Button (Material 3 Outlined Button)
-        OutlinedButton.icon(
-          onPressed: _provider.status == SolverStatus.solving
-              ? null
-              : _provider.clearBoard,
-          icon: const Icon(Icons.refresh_rounded, size: 18),
-          label: const Text(
-            'CLEAR GRID',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-          ),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+        Row(
+          children: [
+            // Solve Selected Button
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: _provider.status == SolverStatus.solving
+                    ? null
+                    : _provider.solveSelectedCell,
+                icon: const Icon(Icons.touch_app_rounded, size: 18),
+                label: const Text(
+                  'SOLVE SELECTED',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                    fontSize: 12,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 12),
+            // Clear Grid Button
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _provider.status == SolverStatus.solving
+                    ? null
+                    : _provider.clearBoard,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text(
+                  'CLEAR GRID',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                    fontSize: 12,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _buildStepExplanationDisplay() {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.secondaryContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: theme.colorScheme.secondary.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.lightbulb_outline_rounded,
+              color: theme.colorScheme.secondary,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Step Solve Technique',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSecondaryContainer,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _provider.stepExplanation!,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSecondaryContainer,
+                      fontSize: 13,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
