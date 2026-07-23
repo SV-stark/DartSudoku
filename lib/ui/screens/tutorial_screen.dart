@@ -585,23 +585,6 @@ class _TutorialScreenState extends State<TutorialScreen>
         }
       });
       _shakeController.forward(from: 0.0);
-
-      _showCoachTipSheet(
-        strategyTitle: lessonTitle,
-        explanation: coachExplanation,
-        onRetry: () {
-          setState(() {
-            _practiceBoard![_practiceHighlightedRow][_practiceHighlightedCol] =
-                0;
-            _practiceShowError = false;
-          });
-        },
-        onShowHint: () {
-          setState(() {
-            _practiceShowHint = true;
-          });
-        },
-      );
     }
   }
 
@@ -1361,6 +1344,46 @@ class _TutorialScreenState extends State<TutorialScreen>
             interactiveHelp: _practiceHelp,
             expectedValue: _practiceExpectedValue,
           ),
+          if (_practiceShowError && !_practiceIsSolved) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  _showCoachTipSheet(
+                    strategyTitle: lessonTitle,
+                    explanation: _practiceHelp,
+                    onRetry: () {
+                      setState(() {
+                        if (_practiceHighlightedRow != -1 &&
+                            _practiceHighlightedCol != -1 &&
+                            _practiceBoard != null) {
+                          _practiceBoard![_practiceHighlightedRow]
+                              [_practiceHighlightedCol] = 0;
+                        }
+                        _practiceShowError = false;
+                      });
+                    },
+                    onShowHint: () {
+                      setState(() {
+                        _practiceShowHint = true;
+                      });
+                    },
+                  );
+                },
+                icon: const Icon(Icons.help_outline_rounded, size: 18),
+                label: const Text('Why was this incorrect?'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.error,
+                  side: BorderSide(
+                    color: theme.colorScheme.error.withValues(alpha: 0.5),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (!_practiceIsSolved) ...[
             const SizedBox(height: 12),
             Center(
