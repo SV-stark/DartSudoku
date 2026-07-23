@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/prefs_keys.dart';
 import '../../providers/settings_provider.dart';
 import '../../core/difficulty.dart';
+import '../../core/services/audio_service.dart';
+import '../../core/achievements_manager.dart';
 import '../theme.dart';
 import 'game_screen.dart';
 import 'solver_screen.dart';
@@ -129,7 +131,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context, themeMode, _) {
                       return FloatingActionButton.small(
                         heroTag: 'theme_toggle',
-                        onPressed: AppTheme.toggleTheme,
+                        onPressed: () {
+                          AudioService.playCellSelect();
+                          AppTheme.toggleTheme();
+                        },
                         tooltip: 'Toggle Theme',
                         child: Icon(
                           themeMode == ThemeMode.dark
@@ -141,9 +146,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(width: 8),
                   FloatingActionButton.small(
+                    heroTag: 'achievements_btn',
+                    onPressed: _showAchievementsModal,
+                    tooltip: 'Achievements',
+                    child: const Icon(Icons.emoji_events_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                  FloatingActionButton.small(
                     heroTag: 'settings_btn',
-                    onPressed: () =>
-                        SettingsSheet.show(context, _settingsProvider),
+                    onPressed: () {
+                      AudioService.playCellSelect();
+                      SettingsSheet.show(context, _settingsProvider);
+                    },
                     tooltip: 'Settings',
                     child: const Icon(Icons.tune_rounded),
                   ),
@@ -160,6 +174,120 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showAchievementsModal() async {
+    AudioService.playCellSelect();
+    final achievements = await AchievementsManager.getAchievements();
+    if (!mounted) return;
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          maxChildSize: 0.85,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.emoji_events_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Trophies & Achievements',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: achievements.length,
+                      itemBuilder: (context, index) {
+                        final ach = achievements[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          color: ach.isUnlocked
+                              ? theme.colorScheme.primaryContainer.withValues(
+                                  alpha: 0.5,
+                                )
+                              : theme.colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.3),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: ach.isUnlocked
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurface.withValues(
+                                      alpha: 0.2,
+                                    ),
+                              child: Icon(
+                                ach.icon,
+                                color: ach.isUnlocked
+                                    ? theme.colorScheme.onPrimary
+                                    : theme.colorScheme.onSurface.withValues(
+                                        alpha: 0.5,
+                                      ),
+                              ),
+                            ),
+                            title: Text(
+                              ach.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: ach.isUnlocked
+                                    ? theme.colorScheme.onSurface
+                                    : theme.colorScheme.onSurface.withValues(
+                                        alpha: 0.5,
+                                      ),
+                              ),
+                            ),
+                            subtitle: Text(ach.description),
+                            trailing: ach.isUnlocked
+                                ? const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: Colors.green,
+                                  )
+                                : const Icon(Icons.lock_rounded, size: 18),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

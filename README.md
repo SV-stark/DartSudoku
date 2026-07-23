@@ -20,31 +20,36 @@ An elegant, modern Sudoku game and solver built with Flutter. DartSudoku impleme
 - **Time Attack Blitz Lobby**: A timed 3-minute recognition game mode designed to test recognition speed. Correct solves add points, while mistakes apply a 15-second time penalty.
 - **School Analytics Dashboard**: A comprehensive statistics sheet tracking total mistakes, tier progress bars, average pattern recognition speed, and personalized training tips.
 
-### 🎮 Play Mode
-- **Three Levels of Difficulty**:
-  - **Easy**: 32 starting clues.
-  - **Medium**: 27 starting clues.
-  - **Hard**: 22 starting clues.
+### 🎮 Play Mode & Gamification
+- **Three Levels of Difficulty**: Easy (32 clues), Medium (27 clues), Hard (22 clues).
 - **Engine-Backed Unique Solutions**: All generated puzzles are guaranteed to have exactly **one unique solution**.
 - **Interactive Tooling**:
   - **Notes (Pencil Mode)**: Jot down candidates. The board automatically filters out conflicting notes in the same row, column, or 3x3 box as you input correct values.
   - **Mistake Limits**: Play with up to 3 mistake hearts.
-  - **Hint System**: Need a hand? Request a hint to open the Strategy Explainer, explaining why a number belongs in a cell.
-  - **Unlimited Undo**: Complete list of moves kept so you can backtrack your steps at any time.
-  - **Pause/Resume Timer**: Keep track of your solving time with an active game timer that can be paused at will.
+  - **Hint System**: Request a hint to open the Strategy Explainer, explaining why a number belongs in a cell.
+  - **Unlimited Undo/Redo**: Complete move history so you can step back and forward at any time.
+  - **Pause/Resume Timer**: Keep track of your solving time with an active game timer.
+- **Audio & Haptic Feedback System**: Tactile clicks, note toggles, mistake alerts, hint reveals, and victory fanfares (`AudioService`).
+- **Trophies & Achievements**: Unlock badges like *First Step*, *Speed Demon*, *Weekly Warrior*, *Sudoku Scholar*, and *Master Tactician*.
 
-### 🧮 Custom Grid Solver
-Enter your custom Sudoku grids (e.g., from newspapers or other puzzles) and choose between two ways to solve:
+### 📅 Daily Challenge & Streak Engine
+- **Date-Based Reproducible Puzzles**: Generates a unique daily Sudoku puzzle using deterministic date seeds.
+- **Streak & Monthly Progress Tracking**: Complete daily puzzles to build active streaks and earn calendar star badges (`DailyChallengeManager`).
+
+### 🧮 Custom Grid Solver & SDK Importer
+Enter custom Sudoku grids (from newspapers or books) and solve:
 1. **Solve Complete**: Resolves the entire board instantly.
-2. **Solve Selected**: Computes the solution and reveals **only the selected cell**, allowing you to get a single clue while keeping the rest of the board in your current custom layout.
-- **Real-Time Input Validation**: Instantly flags violations of Sudoku rules (e.g., duplicate entries in rows, columns, or subgrids) to prevent unsolvable runs.
+2. **Solve Selected**: Computes solution for only the selected cell.
+3. **Solve Step**: Resolves cells step-by-step with strategy explanations.
+- **81-Character SDK String Import**: Paste standard 81-char Sudoku puzzle strings (e.g. `53..7....6..195...`) for instant loading (`SudokuOCRScanner`).
+- **Real-Time Input Validation**: Flags rule violations to prevent unsolvable runs.
 
 ---
 
 ## 🎨 Design Language
-- **Visuals**: Modern, elegant Material 3 dark theme powered by an indigo seed color.
-- **Components**: Solid cards, clean chips, and filled/tonal button configurations.
-- **Grid Layout**: Features highly visible line separators utilising theme `outline` (thick lines separating 3x3 grids) and `outlineVariant` (thin lines separating individual cells) color palettes.
+- **Visuals**: Modern, elegant Material 3 design with dark mode, customizable seed palettes, and hint highlight styling.
+- **Responsive Layout**: Optimized side-by-side dual-pane layout for desktop and tablet screens (>768px width) alongside compact mobile viewports.
+- **Grid Layout**: Highly visible line separators utilizing theme `outline` (3x3 grid borders) and `outlineVariant` (cell borders).
 
 ---
 

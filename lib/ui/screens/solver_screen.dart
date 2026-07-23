@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../providers/sudoku_provider.dart';
+import '../../core/sudoku_ocr_scanner.dart';
+import '../../core/services/audio_service.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
 import '../theme.dart';
@@ -421,6 +423,99 @@ class _SolverScreenState extends State<SolverScreen> {
     );
   }
 
+  void _showSDKImportDialog() {
+    final theme = Theme.of(context);
+    final textController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: theme.colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: theme.colorScheme.primary.withValues(alpha: 0.5),
+            ),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.qr_code_scanner_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Import SDK Puzzle String',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Paste an 81-character puzzle string (dots or 0s for empty cells):',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: textController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: '53..7....6..195....98....6.8...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final parsed = SudokuOCRScanner.parseSDKString(
+                  textController.text.trim(),
+                );
+                if (parsed != null) {
+                  for (int r = 0; r < 9; r++) {
+                    for (int c = 0; c < 9; c++) {
+                      _provider.selectCell(r, c);
+                      if (parsed[r][c] != 0) {
+                        _provider.enterNumber(parsed[r][c]);
+                      } else {
+                        _provider.clearCell();
+                      }
+                    }
+                  }
+                  AudioService.playVictory();
+                  Navigator.pop(context);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Invalid 81-character SDK string. Please verify input.',
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('LOAD GRID'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildHeader() {
     final theme = Theme.of(context);
 
@@ -461,10 +556,22 @@ class _SolverScreenState extends State<SolverScreen> {
           ),
         ),
 
-        // Help Button
-        IconButton.filledTonal(
-          onPressed: _showHelpDialog,
-          icon: const Icon(Icons.help_outline_rounded),
+        // Actions: Import & Help
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton.filledTonal(
+              onPressed: _showSDKImportDialog,
+              tooltip: 'Import SDK Puzzle String',
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: _showHelpDialog,
+              tooltip: 'Manual',
+              icon: const Icon(Icons.help_outline_rounded),
+            ),
+          ],
         ),
       ],
     );

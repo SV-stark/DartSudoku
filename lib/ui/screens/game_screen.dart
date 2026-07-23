@@ -5,6 +5,9 @@ import '../../data/prefs_keys.dart';
 import '../../providers/sudoku_provider.dart';
 import '../../core/difficulty.dart';
 import '../../core/sudoku_analyzer.dart';
+import '../../core/services/audio_service.dart';
+import '../../core/daily_challenge_manager.dart';
+import '../../core/achievements_manager.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
 import '../components/confetti_overlay.dart';
@@ -63,9 +66,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _onStateChange() {
     if (mounted) {
-      if (_provider.status == GameStatus.won &&
-          widget.dailyChallengeDate != null) {
-        _recordDailyChallengeSuccess();
+      if (_provider.status == GameStatus.won) {
+        AudioService.playVictory();
+        AchievementsManager.unlock('first_win');
+        if (_provider.elapsedSeconds < 180) {
+          AchievementsManager.unlock('speed_demon');
+        }
+        if (widget.dailyChallengeDate != null) {
+          _recordDailyChallengeSuccess();
+          DailyChallengeManager.markDateCompleted(DateTime.now());
+        }
+      } else if (_provider.status == GameStatus.gameOver) {
+        AudioService.playError();
       }
       setState(() {});
     }

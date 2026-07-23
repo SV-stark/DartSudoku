@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/audio_service.dart';
 
 /// A custom input keyboard and tool panel designed with Material 3.
 class SudokuNumpad extends StatelessWidget {
@@ -56,7 +57,12 @@ class SudokuNumpad extends StatelessWidget {
             context,
             icon: Icons.undo_rounded,
             label: 'Undo',
-            onTap: canUndo ? onUndoTap : null,
+            onTap: canUndo
+                ? () {
+                    AudioService.playCellSelect();
+                    onUndoTap!();
+                  }
+                : null,
             isActive: false,
             color: Theme.of(context).colorScheme.primary,
           ),
@@ -67,7 +73,12 @@ class SudokuNumpad extends StatelessWidget {
             context,
             icon: Icons.redo_rounded,
             label: 'Redo',
-            onTap: canRedo ? onRedoTap : null,
+            onTap: canRedo
+                ? () {
+                    AudioService.playCellSelect();
+                    onRedoTap!();
+                  }
+                : null,
             isActive: false,
             color: Theme.of(context).colorScheme.primary,
           ),
@@ -77,7 +88,10 @@ class SudokuNumpad extends StatelessWidget {
           context,
           icon: Icons.backspace_rounded,
           label: 'Erase',
-          onTap: onEraseTap,
+          onTap: () {
+            AudioService.playCellSelect();
+            onEraseTap();
+          },
           isActive: false,
           color: Theme.of(context).colorScheme.error,
         ),
@@ -88,7 +102,10 @@ class SudokuNumpad extends StatelessWidget {
             context,
             icon: notesModeActive ? Icons.edit_rounded : Icons.edit_off_rounded,
             label: 'Notes',
-            onTap: onNotesTap,
+            onTap: () {
+              AudioService.playNoteToggle();
+              onNotesTap!();
+            },
             isActive: notesModeActive,
             color: Theme.of(context).colorScheme.secondary,
           ),
@@ -99,7 +116,10 @@ class SudokuNumpad extends StatelessWidget {
             context,
             icon: Icons.lightbulb_rounded,
             label: 'Hint',
-            onTap: onHintTap,
+            onTap: () {
+              AudioService.playHint();
+              onHintTap!();
+            },
             isActive: false,
             color: Theme.of(context).colorScheme.tertiary,
           ),
@@ -204,7 +224,10 @@ class SudokuNumpad extends StatelessWidget {
                 'Number $number, ${isCompleted ? "completed" : "$remainingCount remaining"}',
             button: true,
             child: InkWell(
-              onTap: () => onNumberTap(number),
+              onTap: () {
+                AudioService.playNumberEnter();
+                onNumberTap(number);
+              },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

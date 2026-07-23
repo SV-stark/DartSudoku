@@ -85,7 +85,7 @@ class AppTheme {
     );
   }
 
-  // Grid Cell Highlights using standard Material 3 Container Colors
+  /// Grid Cell Highlights using standard Material 3 Container Colors
   static Color selectedCellBg(BuildContext context) {
     return Theme.of(
       context,
@@ -102,6 +102,19 @@ class AppTheme {
     return Theme.of(
       context,
     ).colorScheme.secondaryContainer.withValues(alpha: 0.4);
+  }
+
+  // Strategy AI Explainer Highlight Colors
+  static Color hintPivotBg(BuildContext context) {
+    return Colors.amber.withValues(alpha: 0.45);
+  }
+
+  static Color hintPincerBg(BuildContext context) {
+    return Colors.lightBlue.withValues(alpha: 0.45);
+  }
+
+  static Color hintEliminationBg(BuildContext context) {
+    return Colors.red.withValues(alpha: 0.35);
   }
 
   static Color clueText(BuildContext context) {

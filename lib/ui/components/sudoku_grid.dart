@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/audio_service.dart';
 import '../theme.dart';
 
 /// An interactive, beautifully rendered 9x9 Sudoku grid built with Material 3 styling.
@@ -187,7 +188,10 @@ class SudokuGrid extends StatelessWidget {
       selected: isSelected,
       child: GestureDetector(
         key: Key('cell_${r}_$c'),
-        onTap: () => onCellTap(r, c),
+        onTap: () {
+          AudioService.playCellSelect();
+          onCellTap(r, c);
+        },
         behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
