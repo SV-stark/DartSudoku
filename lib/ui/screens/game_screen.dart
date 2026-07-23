@@ -11,9 +11,11 @@ import '../../core/achievements_manager.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
 import '../components/confetti_overlay.dart';
+import '../components/replay_dialog.dart';
 import '../theme.dart';
 import 'settings_sheet.dart';
 import '../../providers/settings_provider.dart';
+
 
 /// The game screen where players solve generated boards.
 class GameScreen extends StatefulWidget {
@@ -66,6 +68,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _onStateChange() {
     if (mounted) {
+      if (_provider.lastMistakeDiagnostic != null) {
+        final diag = _provider.lastMistakeDiagnostic!;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _provider.clearMistakeDiagnostic();
+          _showMistakeDiagnosticDialog(diag);
+        });
+      }
       if (_provider.status == GameStatus.won) {
         AudioService.playVictory();
         AchievementsManager.unlock('first_win');
@@ -82,6 +91,61 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       setState(() {});
     }
   }
+
+  void _showMistakeDiagnosticDialog(MistakeDiagnosticResult diag) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: theme.colorScheme.error),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  diag.title,
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            diag.explanation,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('GOT IT'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Map<String, double> _calculateHesitationHeatmap() {
+    final map = <String, double>{};
+    if (_provider.moveHistory.isEmpty) return map;
+    int maxDur = 1;
+    for (var m in _provider.moveHistory) {
+      if (m.durationMs > maxDur) maxDur = m.durationMs;
+    }
+    for (var m in _provider.moveHistory) {
+      double score = (m.durationMs / maxDur).clamp(0.0, 1.0);
+      map['${m.row},${m.col}'] = score;
+    }
+    return map;
+  }
+
 
   Future<void> _recordDailyChallengeSuccess() async {
     try {
@@ -344,25 +408,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           _provider.selectionNotifier,
                         ]),
                         builder: (context, _) {
-                          return SudokuGrid(
-                            board: _provider.currentBoard,
-                            selectedRow: _provider.selectedRow,
-                            selectedCol: _provider.selectedCol,
-                            isClue: _provider.isOriginalClue,
-                            notes: _provider.notes,
-                            solvedBoard: _provider.solvedBoard,
-                            highlightConflicts: _provider.highlightConflicts,
-                            highlightIdentical: _provider.highlightIdentical,
-                            showMistakes: _provider.showMistakes,
-                            flashRow: _provider.flashRow,
-                            flashCol: _provider.flashCol,
-                            customCellBgs: _provider.activeHintHighlights,
-                            onCellTap: (r, c) {
-                              _provider.selectCell(r, c);
-                            },
-                          );
-                        },
-                      ),
+                            return SudokuGrid(
+                              board: _provider.currentBoard,
+                              selectedRow: _provider.selectedRow,
+                              selectedCol: _provider.selectedCol,
+                              isClue: _provider.isOriginalClue,
+                              notes: _provider.notes,
+                              solvedBoard: _provider.solvedBoard,
+                              highlightConflicts: _provider.highlightConflicts,
+                              highlightIdentical: _provider.highlightIdentical,
+                              showMistakes: _provider.showMistakes,
+                              flashRow: _provider.flashRow,
+                              flashCol: _provider.flashCol,
+                              customCellBgs: _provider.activeHintHighlights,
+                              cellColors: _provider.cellColors,
+                              candidateColors: _provider.candidateColors,
+                              variant: _provider.activeVariant,
+                              killerCages: _provider.killerCages,
+                              hesitationHeatmap: _provider.showHesitationHeatmap
+                                  ? _calculateHesitationHeatmap()
+                                  : null,
+                              onCellTap: (r, c) {
+                                _provider.selectCell(r, c);
+                              },
+                            );
+                          },
+                        ),
               ),
             ),
           ),
@@ -394,6 +465,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         canUndo: _provider.canUndo,
                         canRedo: _provider.canRedo,
                         numberCounts: _provider.numberCounts,
+                        selectedColorIndex: _provider.selectedColorIndex,
+                        onColorSelect: (idx) {
+                          _provider.setSelectedColorIndex(idx);
+                          if (_provider.selectedRow != -1 &&
+                              _provider.selectedCol != -1) {
+                            _provider.toggleCellColor(
+                              _provider.selectedRow,
+                              _provider.selectedCol,
+                            );
+                          }
+                        },
                       ),
                   ],
                 ),
@@ -438,6 +520,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               showMistakes: _provider.showMistakes,
                               flashRow: _provider.flashRow,
                               flashCol: _provider.flashCol,
+                              cellColors: _provider.cellColors,
+                              candidateColors: _provider.candidateColors,
+                              variant: _provider.activeVariant,
+                              killerCages: _provider.killerCages,
+                              hesitationHeatmap: _provider.showHesitationHeatmap
+                                  ? _calculateHesitationHeatmap()
+                                  : null,
                               onCellTap: (r, c) {
                                 _provider.selectCell(r, c);
                               },
@@ -462,6 +551,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     canUndo: _provider.canUndo,
                     canRedo: _provider.canRedo,
                     numberCounts: _provider.numberCounts,
+                    selectedColorIndex: _provider.selectedColorIndex,
+                    onColorSelect: (idx) {
+                      _provider.setSelectedColorIndex(idx);
+                      if (_provider.selectedRow != -1 &&
+                          _provider.selectedCol != -1) {
+                        _provider.toggleCellColor(
+                          _provider.selectedRow,
+                          _provider.selectedCol,
+                        );
+                      }
+                    },
                   ),
                 ),
             ],
@@ -859,7 +959,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          ReplayDialog.show(
+                            context,
+                            moveHistory: _provider.moveHistory,
+                            initialBoard: _provider.solvedBoard,
+                            isClue: _provider.isOriginalClue,
+                          );
+                        },
+                        icon: const Icon(Icons.play_circle_fill_rounded),
+                        label: const Text('REPLAY SOLVE SESSION'),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Row(
                         children: [
                           Expanded(
@@ -878,6 +994,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           ),
                         ],
                       ),
+
                     ],
                   ),
                 ),

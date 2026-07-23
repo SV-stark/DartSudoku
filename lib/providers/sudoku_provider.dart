@@ -19,6 +19,26 @@ class BoardState {
   BoardState({required this.board, required this.notes});
 }
 
+/// Record of an individual move for replay and hesitation heatmap calculation.
+class MoveRecord {
+  final int timestampMs;
+  final int row;
+  final int col;
+  final int value;
+  final bool isNote;
+  final int durationMs;
+
+  MoveRecord({
+    required this.timestampMs,
+    required this.row,
+    required this.col,
+    required this.value,
+    required this.isNote,
+    required this.durationMs,
+  });
+}
+
+
 enum GameStatus { idle, loading, playing, paused, won, gameOver }
 
 /// Manages the state of the active play game.
@@ -70,6 +90,23 @@ class SudokuGameProvider extends ChangeNotifier {
   Map<int, int> _numberCounts = {};
   int _totalClues = 0;
 
+  // Multi-color Palette State (0: Default, 1: Blue, 2: Green, 3: Orange, 4: Purple)
+  int _selectedColorIndex = 0;
+  final Map<String, int> _cellColors = {};
+  final Map<String, int> _candidateColors = {};
+
+  // Session Replay & Hesitation Heatmap Tracking
+  final List<MoveRecord> _moveHistory = [];
+  bool _showHesitationHeatmap = false;
+  int _lastMoveTimeMs = DateTime.now().millisecondsSinceEpoch;
+
+  // Sudoku Variant & Rules Engine State
+  SudokuVariant _activeVariant = SudokuVariant.standard;
+  List<KillerCage>? _killerCages;
+
+  // Diagnostic Mistake Analysis Result
+  MistakeDiagnosticResult? _lastMistakeDiagnostic;
+
   SudokuGameProvider() {
     SettingsProvider.instance.addListener(_onSettingsChanged);
     _onBoardStateChanged();
@@ -98,6 +135,70 @@ class SudokuGameProvider extends ChangeNotifier {
 
   int get flashRow => _flashRow;
   int get flashCol => _flashCol;
+
+  // Multi-color Palette Getters & Setters
+  int get selectedColorIndex => _selectedColorIndex;
+  Map<String, int> get cellColors => Map.unmodifiable(_cellColors);
+  Map<String, int> get candidateColors => Map.unmodifiable(_candidateColors);
+
+  void setSelectedColorIndex(int index) {
+    _selectedColorIndex = index;
+    notifyListeners();
+  }
+
+  void toggleCellColor(int r, int c) {
+    final key = '$r,$c';
+    if (_selectedColorIndex == 0) {
+      _cellColors.remove(key);
+    } else {
+      if (_cellColors[key] == _selectedColorIndex) {
+        _cellColors.remove(key);
+      } else {
+        _cellColors[key] = _selectedColorIndex;
+      }
+    }
+    notifyListeners();
+  }
+
+  void toggleCandidateColor(int r, int c, int digit) {
+    final key = '$r,$c,$digit';
+    if (_selectedColorIndex == 0) {
+      _candidateColors.remove(key);
+    } else {
+      if (_candidateColors[key] == _selectedColorIndex) {
+        _candidateColors.remove(key);
+      } else {
+        _candidateColors[key] = _selectedColorIndex;
+      }
+    }
+    notifyListeners();
+  }
+
+  void clearColors() {
+    _cellColors.clear();
+    _candidateColors.clear();
+    notifyListeners();
+  }
+
+  // Session Replay & Hesitation Heatmap Getters & Setters
+  List<MoveRecord> get moveHistory => List.unmodifiable(_moveHistory);
+  bool get showHesitationHeatmap => _showHesitationHeatmap;
+
+  void toggleHesitationHeatmap() {
+    _showHesitationHeatmap = !_showHesitationHeatmap;
+    notifyListeners();
+  }
+
+  // Variant & Diagnostic Getters
+  SudokuVariant get activeVariant => _activeVariant;
+  List<KillerCage>? get killerCages => _killerCages;
+  MistakeDiagnosticResult? get lastMistakeDiagnostic => _lastMistakeDiagnostic;
+
+  void clearMistakeDiagnostic() {
+    _lastMistakeDiagnostic = null;
+    notifyListeners();
+  }
+
 
   // Settings properties delegated to SettingsProvider
   bool get showMistakes => SettingsProvider.instance.showMistakes;
@@ -160,8 +261,12 @@ class SudokuGameProvider extends ChangeNotifier {
     selectionNotifier.notifyListeners();
   }
 
-  /// Start a new game with [difficulty], optionally seeded for a [dailyDate] challenge
-  Future<void> newGame(Difficulty difficulty, {String? dailyDate}) async {
+  /// Start a new game with [difficulty], optionally seeded for a [dailyDate] challenge and [variant]
+  Future<void> newGame(
+    Difficulty difficulty, {
+    String? dailyDate,
+    SudokuVariant variant = SudokuVariant.standard,
+  }) async {
     _status = GameStatus.loading;
     notifyListeners();
 
@@ -174,11 +279,13 @@ class SudokuGameProvider extends ChangeNotifier {
 
     // Generate puzzle asynchronously in a background isolate to keep UI responsive
     final puzzle = await Isolate.run(
-      () => SudokuLogic.generatePuzzle(difficulty, seed: seed),
+      () => SudokuLogic.generatePuzzle(difficulty, seed: seed, variant: variant),
     );
 
     _difficulty = difficulty;
     _dailyChallengeDate = dailyDate;
+    _activeVariant = variant;
+    _killerCages = puzzle.cages;
     _currentBoard = SudokuLogic.copyBoard(puzzle.puzzleBoard);
     _solvedBoard = SudokuLogic.copyBoard(puzzle.solvedBoard);
     _isOriginalClue = List.generate(
@@ -200,6 +307,11 @@ class SudokuGameProvider extends ChangeNotifier {
     _notesMode = false;
     _undoHistory.clear();
     _redoHistory.clear();
+    _cellColors.clear();
+    _candidateColors.clear();
+    _moveHistory.clear();
+    _lastMistakeDiagnostic = null;
+    _lastMoveTimeMs = DateTime.now().millisecondsSinceEpoch;
 
     _onBoardStateChanged();
 
@@ -329,6 +441,21 @@ class SudokuGameProvider extends ChangeNotifier {
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
 
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final durationMs = now - _lastMoveTimeMs;
+    _lastMoveTimeMs = now;
+
+    _moveHistory.add(
+      MoveRecord(
+        timestampMs: now,
+        row: _selectedRow,
+        col: _selectedCol,
+        value: number,
+        isNote: _notesMode,
+        durationMs: durationMs,
+      ),
+    );
+
     if (_notesMode) {
       // Toggle note
       _saveToHistory();
@@ -351,6 +478,14 @@ class SudokuGameProvider extends ChangeNotifier {
 
       // Check if the number is correct compared to solution
       if (number != _solvedBoard[_selectedRow][_selectedCol]) {
+        _lastMistakeDiagnostic = SudokuAnalyzer.analyzeMistake(
+          _currentBoard,
+          _selectedRow,
+          _selectedCol,
+          number,
+          _solvedBoard,
+          variant: _activeVariant,
+        );
         if (showMistakes) {
           _mistakes++;
           if (!endlessMode && _mistakes >= GameConstants.maxMistakes) {
@@ -361,6 +496,7 @@ class SudokuGameProvider extends ChangeNotifier {
           }
         }
       } else {
+        _lastMistakeDiagnostic = null;
         // Auto-clean notes for surrounding cells in same row, column, and box
         if (autoRemoveNotes) {
           _cleanSurroundingNotes(_selectedRow, _selectedCol, number);
@@ -379,6 +515,7 @@ class SudokuGameProvider extends ChangeNotifier {
     notifyListeners();
     await _saveGameState();
   }
+
 
   /// Clears the selected cell
   Future<void> eraseCell() async {

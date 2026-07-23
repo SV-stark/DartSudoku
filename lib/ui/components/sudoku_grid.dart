@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/services/audio_service.dart';
+import '../../core/sudoku_logic.dart';
 import '../theme.dart';
+
 
 /// An interactive, beautifully rendered 9x9 Sudoku grid built with Material 3 styling.
 class SudokuGrid extends StatelessWidget {
@@ -17,7 +19,12 @@ class SudokuGrid extends StatelessWidget {
   final int flashRow;
   final int flashCol;
   final Map<String, Color>? customCellBgs;
+  final Map<String, int>? cellColors;
+  final Map<String, int>? candidateColors;
   final int candidateFilter;
+  final SudokuVariant variant;
+  final List<KillerCage>? killerCages;
+  final Map<String, double>? hesitationHeatmap;
 
   const SudokuGrid({
     super.key,
@@ -34,8 +41,36 @@ class SudokuGrid extends StatelessWidget {
     this.flashRow = -1,
     this.flashCol = -1,
     this.customCellBgs,
+    this.cellColors,
+    this.candidateColors,
     this.candidateFilter = -1,
+    this.variant = SudokuVariant.standard,
+    this.killerCages,
+    this.hesitationHeatmap,
   });
+
+  static Color _getPaletteColor(int index, {bool isCandidate = false}) {
+    switch (index) {
+      case 1:
+        return isCandidate
+            ? Colors.blue.shade700
+            : Colors.blue.withValues(alpha: 0.35);
+      case 2:
+        return isCandidate
+            ? Colors.green.shade700
+            : Colors.green.withValues(alpha: 0.35);
+      case 3:
+        return isCandidate
+            ? Colors.orange.shade800
+            : Colors.orange.withValues(alpha: 0.35);
+      case 4:
+        return isCandidate
+            ? Colors.purple.shade700
+            : Colors.purple.withValues(alpha: 0.35);
+      default:
+        return Colors.transparent;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +120,13 @@ class SudokuGrid extends StatelessWidget {
       bool sameCol = c == selectedCol;
       bool sameBox =
           (r ~/ 3 == selectedRow ~/ 3) && (c ~/ 3 == selectedCol ~/ 3);
-      isRelated = sameRow || sameCol || sameBox;
+      bool sameDiagonal = false;
+      if (variant == SudokuVariant.diagonalX) {
+        bool mainDiag = (selectedRow == selectedCol) && (r == c);
+        bool antiDiag = (selectedRow + selectedCol == 8) && (r + c == 8);
+        sameDiagonal = mainDiag || antiDiag;
+      }
+      isRelated = sameRow || sameCol || sameBox || sameDiagonal;
     }
 
     // Check matching digit
@@ -99,11 +140,22 @@ class SudokuGrid extends StatelessWidget {
       isSameNumber = value == selectedValue;
     }
 
-    // Colors mapping from M3 Theme
+    // Color palette or Heatmap computation
     Color cellBg = Colors.transparent;
     final bool isFlash = r == flashRow && c == flashCol;
-    if (candidateFilter != -1 && value == candidateFilter) {
+    final cellColorIdx = cellColors != null ? cellColors!['$r,$c'] : null;
+
+    if (hesitationHeatmap != null && hesitationHeatmap!.containsKey('$r,$c')) {
+      double score = hesitationHeatmap!['$r,$c']!;
+      cellBg = Color.lerp(
+        Colors.green.withValues(alpha: 0.35),
+        Colors.red.withValues(alpha: 0.65),
+        score,
+      )!;
+    } else if (candidateFilter != -1 && value == candidateFilter) {
       cellBg = gridTheme.colorScheme.primaryContainer.withValues(alpha: 0.65);
+    } else if (cellColorIdx != null && cellColorIdx != 0) {
+      cellBg = _getPaletteColor(cellColorIdx);
     } else if (customCellBgs != null && customCellBgs!.containsKey('$r,$c')) {
       cellBg = customCellBgs!['$r,$c']!;
     } else if (isFlash) {
@@ -114,6 +166,29 @@ class SudokuGrid extends StatelessWidget {
       cellBg = gridTheme.sameNumberBg;
     } else if (isRelated) {
       cellBg = gridTheme.relatedCellBg;
+    } else if (variant == SudokuVariant.diagonalX && (r == c || r + c == 8)) {
+      cellBg = gridTheme.colorScheme.secondaryContainer.withValues(
+        alpha: 0.18,
+      );
+    }
+
+    // Killer Cage lookup
+    KillerCage? cage;
+    int? cageSumLabel;
+    if (variant == SudokuVariant.killer && killerCages != null) {
+      cage = killerCages!.firstWhere(
+        (cg) => cg.containsCell(r, c),
+        orElse: () => const KillerCage(id: -1, cells: [], targetSum: 0),
+      );
+      if (cage.id != -1) {
+        // If this is top-left most cell of cage, display target sum
+        final firstCell = cage.cells.reduce(
+          (a, b) => (a.x < b.x || (a.x == b.x && a.y < b.y)) ? a : b,
+        );
+        if (firstCell.x == r && firstCell.y == c) {
+          cageSumLabel = cage.targetSum;
+        }
+      }
     }
 
     // Material 3 Borders
@@ -166,71 +241,67 @@ class SudokuGrid extends StatelessWidget {
       textStyle = const TextStyle(color: Colors.transparent);
     }
 
-    // Build accessibility semantics label
-    final List<String> semanticsParts = [
-      'Row ${r + 1} Column ${c + 1}',
-      value != 0 ? 'Value $value' : 'Empty',
-      isStartingClue ? 'clue' : 'input',
-    ];
-    if (isSelected) {
-      semanticsParts.add('selected');
-    } else if (isRelated) {
-      semanticsParts.add('related');
-    }
-    if (value == 0 && notes != null && notes![r][c].isNotEmpty) {
-      semanticsParts.add('notes ${notes![r][c].join(', ')}');
-    }
-    final semanticsLabel = semanticsParts.join(', ');
-
-    return Semantics(
-      label: semanticsLabel,
-      button: true,
-      selected: isSelected,
-      child: GestureDetector(
-        key: Key('cell_${r}_$c'),
-        onTap: () {
-          AudioService.playCellSelect();
-          onCellTap(r, c);
-        },
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            color: cellBg,
-            border: Border(bottom: bottomBorder, right: rightBorder),
-          ),
-          child: Container(
-            alignment: Alignment.center,
-            decoration: isSelected
-                ? BoxDecoration(
-                    border: Border.all(
-                      color: gridTheme.colorScheme.primary,
-                      width: 2.0,
-                    ),
-                  )
-                : null,
-            child: value != 0
-                ? Center(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (child, animation) {
-                        return ScaleTransition(
-                          scale: animation,
-                          child: FadeTransition(
-                            opacity: animation,
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Text(
-                        '$value',
-                        key: ValueKey<int>(value),
-                        style: textStyle,
+    return GestureDetector(
+      key: Key('cell_${r}_$c'),
+      onTap: () {
+        AudioService.playCellSelect();
+        onCellTap(r, c);
+      },
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: cellBg,
+          border: Border(bottom: bottomBorder, right: rightBorder),
+        ),
+        child: Stack(
+          children: [
+            if (cageSumLabel != null)
+              Positioned(
+                top: 2,
+                left: 3,
+                child: Text(
+                  '$cageSumLabel',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    color: gridTheme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            Container(
+              alignment: Alignment.center,
+              decoration: isSelected
+                  ? BoxDecoration(
+                      border: Border.all(
+                        color: gridTheme.colorScheme.primary,
+                        width: 2.0,
                       ),
-                    ),
-                  )
-                : _buildNotes(context, r, c, gridTheme),
-          ),
+                    )
+                  : null,
+              child: value != 0
+                  ? Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        transitionBuilder: (child, animation) {
+                          return ScaleTransition(
+                            scale: animation,
+                            child: FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: Text(
+                          '$value',
+                          key: ValueKey<int>(value),
+                          style: textStyle,
+                        ),
+                      ),
+                    )
+                  : _buildNotes(context, r, c, gridTheme),
+            ),
+          ],
         ),
       ),
     );
@@ -257,7 +328,14 @@ class SudokuGrid extends StatelessWidget {
                 double fontSize = 9;
                 FontWeight weight = FontWeight.bold;
 
-                if (candidateFilter != -1) {
+                final candColorIdx = candidateColors != null
+                    ? candidateColors!['$r,$c,$noteNum']
+                    : null;
+                if (candColorIdx != null && candColorIdx != 0) {
+                  noteColor = _getPaletteColor(candColorIdx, isCandidate: true);
+                  fontSize = 10;
+                  weight = FontWeight.w900;
+                } else if (candidateFilter != -1) {
                   if (noteNum == candidateFilter) {
                     noteColor = Colors.orange.shade800;
                     fontSize = 11;
@@ -312,3 +390,4 @@ class _GridTheme {
       noteText = AppTheme.noteText(context),
       errorText = AppTheme.errorText(context);
 }
+

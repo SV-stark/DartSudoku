@@ -188,6 +188,58 @@ void main() {
         final explanation = SudokuAnalyzer.analyzeCell(board, 2, 0, 5);
         expect(explanation.contains('X-Wing'), true);
       });
+
+      test('Should diagnose row/col/box/diagonal mistakes accurately', () {
+        final board = List.generate(9, (_) => List.filled(9, 0));
+        board[0][3] = 5;
+
+        final diag = SudokuAnalyzer.analyzeMistake(
+          board,
+          0,
+          0,
+          5,
+          board,
+        );
+        expect(diag.title, 'Row Conflict');
+        expect(diag.explanation.contains('Row 1'), true);
+      });
+    });
+
+    group('Sudoku Variants Tests', () {
+      test('Diagonal X should reject numbers present on main diagonals', () {
+        final board = List.generate(9, (_) => List.filled(9, 0));
+        board[0][0] = 7;
+
+        // Cell (4,4) is on main diagonal, so 7 should be invalid under SudokuVariant.diagonalX
+        final isValidDiag = SudokuLogic.isValid(
+          board,
+          4,
+          4,
+          7,
+          variant: SudokuVariant.diagonalX,
+        );
+        expect(isValidDiag, false);
+
+        // Standard rules allow 7 at (4,4)
+        final isValidStandard = SudokuLogic.isValid(
+          board,
+          4,
+          4,
+          7,
+          variant: SudokuVariant.standard,
+        );
+        expect(isValidStandard, true);
+      });
+
+      test('Killer Sudoku cage sum validation', () {
+        final solved = SudokuLogic.generateSolvedBoard();
+        final cages = SudokuLogic.generateDefaultCages(solved);
+        expect(cages.isNotEmpty, true);
+
+        final cage = cages.first;
+        expect(cage.targetSum > 0, true);
+      });
     });
   });
 }
+

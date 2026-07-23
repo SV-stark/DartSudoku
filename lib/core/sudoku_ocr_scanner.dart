@@ -43,4 +43,15 @@ class SudokuOCRScanner {
     }
     return buffer.toString();
   }
+
+  /// Parses multi-line OCR text or photo scan output into a 9x9 board.
+  static List<List<int>>? scanFromImageText(String rawOcrText) {
+    // Extract digit/dot characters line by line or sequentially
+    final digitsAndDots = rawOcrText.replaceAll(RegExp(r'[^1-9\.0]'), '');
+    if (digitsAndDots.length >= 81) {
+      return parseSDKString(digitsAndDots.substring(0, 81));
+    }
+    return null;
+  }
 }
+

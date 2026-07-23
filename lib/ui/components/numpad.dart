@@ -15,6 +15,8 @@ class SudokuNumpad extends StatelessWidget {
   final bool canUndo;
   final bool canRedo;
   final Map<int, int>? numberCounts;
+  final int selectedColorIndex;
+  final Function(int colorIndex)? onColorSelect;
 
   const SudokuNumpad({
     super.key,
@@ -28,6 +30,8 @@ class SudokuNumpad extends StatelessWidget {
     this.canUndo = false,
     this.canRedo = false,
     this.numberCounts,
+    this.selectedColorIndex = 0,
+    this.onColorSelect,
   });
 
   @override
@@ -40,12 +44,78 @@ class SudokuNumpad extends StatelessWidget {
       children: [
         if (hasExtraTools) ...[
           _buildToolRow(context),
-          const SizedBox(height: 16),
+          if (onColorSelect != null) ...[
+            const SizedBox(height: 10),
+            _buildColorPalette(context),
+          ],
+          const SizedBox(height: 14),
         ],
         _buildNumberGrid(context),
       ],
     );
   }
+
+  Widget _buildColorPalette(BuildContext context) {
+    final colors = [
+      Colors.grey,
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+    ];
+    final labels = ['Off', 'Blue', 'Green', 'Orange', 'Purple'];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(colors.length, (idx) {
+        final isSelected = selectedColorIndex == idx;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6.0),
+          child: InkWell(
+            onTap: () {
+              AudioService.playCellSelect();
+              onColorSelect!(idx);
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                  width: 2.5,
+                ),
+              ),
+              child: Tooltip(
+                message: 'Highlight ${labels[idx]}',
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: idx == 0
+                        ? Theme.of(context).colorScheme.surfaceContainerHighest
+                        : colors[idx],
+                    shape: BoxShape.circle,
+                  ),
+                  child: idx == 0
+                      ? Icon(
+                          Icons.format_color_reset,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        )
+                      : null,
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
 
   Widget _buildToolRow(BuildContext context) {
     return Row(

@@ -36,15 +36,30 @@ An elegant, modern Sudoku game and solver built with Flutter. DartSudoku impleme
 - **Date-Based Reproducible Puzzles**: Generates a unique daily Sudoku puzzle using deterministic date seeds.
 - **Streak & Monthly Progress Tracking**: Complete daily puzzles to build active streaks and earn calendar star badges (`DailyChallengeManager`).
 
-### 🧮 Custom Grid Solver & SDK Importer
+### 🎨 Multi-Color Cell & Candidate Palette (Chaining Tools)
+- **5-Color Highlight Palette**: Paint cell backgrounds or individual candidate notes with Blue, Green, Orange, or Purple tints for tracing conjugate chains, wings, and coloring techniques directly on the grid.
+
+### 🧩 Sudoku Variants & Rules Engine
+- **Sudoku X (Diagonal Sudoku)**: Enforces rule constraints where both main 9-cell diagonals must contain unique digits 1–9.
+- **Killer Sudoku Cages**: Dotted cage outlines with target sum badges requiring digits within each cage to sum up without repeating.
+
+### 🤖 AI Smart Coach Diagnostics & "Why Is This Wrong?"
+- **Detailed Conflict Analysis**: Instant diagnostic modal explaining *why* an entered number is incorrect (row, column, 3x3 box, diagonal, or downstream candidate elimination conflict).
+
+### 🎬 Game Session Replay & Hesitation Heatmap
+- **Interactive Solve Replay Scrubber**: Step-by-step time-lapse playback modal with play/pause and 1x, 2x, 4x speed controls.
+- **Hesitation Heatmap**: Visual green-to-red gradient overlay on cells highlighting where you hesitated or spent the longest duration thinking.
+
+### 🧮 Custom Grid Solver & Camera OCR Importer
 Enter custom Sudoku grids (from newspapers or books) and solve:
 1. **Solve Complete**: Resolves the entire board instantly.
 2. **Solve Selected**: Computes solution for only the selected cell.
 3. **Solve Step**: Resolves cells step-by-step with strategy explanations.
-- **81-Character SDK String Import**: Paste standard 81-char Sudoku puzzle strings (e.g. `53..7....6..195...`) for instant loading (`SudokuOCRScanner`).
+- **81-Character SDK & Camera OCR String Import**: Paste standard 81-char Sudoku puzzle strings or raw camera OCR photo text (`SudokuOCRScanner`).
 - **Real-Time Input Validation**: Flags rule violations to prevent unsolvable runs.
 
 ---
+
 
 ## 🎨 Design Language
 - **Visuals**: Modern, elegant Material 3 design with dark mode, customizable seed palettes, and hint highlight styling.

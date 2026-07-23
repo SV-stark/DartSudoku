@@ -1,4 +1,7 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'sudoku_logic.dart';
+
 
 /// Detailed result of a cell strategy hint analysis including visual annotations.
 class HintAnalysisResult {
@@ -718,6 +721,93 @@ class SudokuAnalyzer {
     return null;
   }
 
+  /// Diagnostic result when a user enters an incorrect digit.
+  static MistakeDiagnosticResult analyzeMistake(
+    List<List<int>> currentBoard,
+    int row,
+    int col,
+    int incorrectVal,
+    List<List<int>> solvedBoard, {
+    SudokuVariant variant = SudokuVariant.standard,
+  }) {
+    // 1. Direct Row Conflict
+    for (int c = 0; c < 9; c++) {
+      if (c != col && currentBoard[row][c] == incorrectVal) {
+        return MistakeDiagnosticResult(
+          title: "Row Conflict",
+          explanation:
+              "Digit $incorrectVal is already present in Row ${row + 1} (Column ${c + 1}). A row can only contain each digit 1-9 once.",
+          conflictCell: Point(row, c),
+        );
+      }
+    }
+
+    // 2. Direct Column Conflict
+    for (int r = 0; r < 9; r++) {
+      if (r != row && currentBoard[r][col] == incorrectVal) {
+        return MistakeDiagnosticResult(
+          title: "Column Conflict",
+          explanation:
+              "Digit $incorrectVal is already present in Column ${col + 1} (Row ${r + 1}). A column can only contain each digit 1-9 once.",
+          conflictCell: Point(r, col),
+        );
+      }
+    }
+
+    // 3. Direct 3x3 Box Conflict
+    int boxR = row - row % 3;
+    int boxC = col - col % 3;
+    for (int r = boxR; r < boxR + 3; r++) {
+      for (int c = boxC; c < boxC + 3; c++) {
+        if ((r != row || c != col) && currentBoard[r][c] == incorrectVal) {
+          return MistakeDiagnosticResult(
+            title: "3x3 Box Conflict",
+            explanation:
+                "Digit $incorrectVal is already present in this 3x3 box at Row ${r + 1}, Column ${c + 1}.",
+            conflictCell: Point(r, c),
+          );
+        }
+      }
+    }
+
+    // 4. Diagonal X Conflict
+    if (variant == SudokuVariant.diagonalX) {
+      if (row == col) {
+        for (int i = 0; i < 9; i++) {
+          if (i != row && currentBoard[i][i] == incorrectVal) {
+            return MistakeDiagnosticResult(
+              title: "Diagonal Conflict",
+              explanation:
+                  "Digit $incorrectVal is already present on the main diagonal (Row ${i + 1}, Column ${i + 1}).",
+              conflictCell: Point(i, i),
+            );
+          }
+        }
+      }
+      if (row + col == 8) {
+        for (int i = 0; i < 9; i++) {
+          if (i != row && currentBoard[i][8 - i] == incorrectVal) {
+            return MistakeDiagnosticResult(
+              title: "Anti-Diagonal Conflict",
+              explanation:
+                  "Digit $incorrectVal is already present on the anti-diagonal (Row ${i + 1}, Column ${9 - i}).",
+              conflictCell: Point(i, 8 - i),
+            );
+          }
+        }
+      }
+    }
+
+    // 5. Logical Constraint Downstream Violation
+    int correctVal = solvedBoard[row][col];
+    return MistakeDiagnosticResult(
+      title: "Logical Solution Violation",
+      explanation:
+          "Placing $incorrectVal in Row ${row + 1}, Column ${col + 1} creates a downstream contradiction. The unique logical solution for this cell is $correctVal.",
+      conflictCell: Point(row, col),
+    );
+  }
+
   /// Helper to check if val is valid in currentBoard at (row, col) ignoring the cell's current value
   static bool isValidForAnalysis(
     List<List<int>> board,
@@ -744,3 +834,17 @@ class SudokuAnalyzer {
     return true;
   }
 }
+
+/// Diagnostic result for mistake analysis.
+class MistakeDiagnosticResult {
+  final String title;
+  final String explanation;
+  final Point<int> conflictCell;
+
+  MistakeDiagnosticResult({
+    required this.title,
+    required this.explanation,
+    required this.conflictCell,
+  });
+}
+
