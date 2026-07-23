@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../components/sudoku_grid.dart';
 import '../../core/sudoku_lessons_data.dart';
 import '../../core/sudoku_logic.dart';
+import '../../core/services/audio_service.dart';
 
 /// Interactive tutorial screen providing slides, explainers, and highlighted grids for strategies.
 class TutorialScreen extends StatefulWidget {
@@ -377,6 +378,132 @@ class _TutorialScreenState extends State<TutorialScreen>
     return 'Look at the highlighted cells and apply the rules of the $title technique to find the correct value.';
   }
 
+  void _showCoachTipSheet({
+    required String strategyTitle,
+    required String explanation,
+    required VoidCallback onRetry,
+    required VoidCallback onShowHint,
+  }) {
+    AudioService.playError();
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.errorContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.school_rounded,
+                      color: theme.colorScheme.error,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Coach Tip: $strategyTitle',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          'Interactive Strategy Guidance',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.5,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Text(
+                  explanation,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    height: 1.45,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onShowHint();
+                      },
+                      icon: const Icon(
+                        Icons.lightbulb_outline_rounded,
+                        size: 18,
+                      ),
+                      label: const Text('HIGHLIGHT PATTERN'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onRetry();
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('RETRY STEP'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _handleNumpadTap(int number) {
     if (_isSolved) return;
     final lessons = SudokuLessonsData.getLessons(context);
@@ -384,15 +511,18 @@ class _TutorialScreenState extends State<TutorialScreen>
     final slide = lesson.slides[_currentSlideIndex];
 
     if (number == slide.expectedValue) {
+      AudioService.playNumberEnter();
       setState(() {
         _currentBoard![slide.highlightedRow][slide.highlightedCol] = number;
         _isSolved = true;
         _showErrorHint = false;
       });
       if (_currentSlideIndex == lesson.slides.length - 1) {
+        AudioService.playVictory();
         _completeLesson(_currentLessonIndex);
       }
     } else {
+      AudioService.playError();
       setState(() {
         _currentBoard![slide.highlightedRow][slide.highlightedCol] = number;
         _showErrorHint = true;
@@ -404,6 +534,7 @@ class _TutorialScreenState extends State<TutorialScreen>
   void _handlePracticeNumpadTap(int number) {
     if (_practiceIsSolved) return;
     if (_practiceStage < 2) {
+      AudioService.playError();
       _shakeController.forward(from: 0.0);
       return;
     }
@@ -411,6 +542,7 @@ class _TutorialScreenState extends State<TutorialScreen>
     final lessonTitle = lessons[_practiceLessonIndex].title;
 
     if (number == _practiceExpectedValue) {
+      AudioService.playVictory();
       setState(() {
         _practiceBoard![_practiceHighlightedRow][_practiceHighlightedCol] =
             number;
@@ -433,12 +565,15 @@ class _TutorialScreenState extends State<TutorialScreen>
         _solvePractice(_practiceLessonIndex);
       }
     } else {
+      _totalMistakesMade++;
+      final String coachExplanation =
+          "You entered $number, but according to the rules of $lessonTitle, the correct solution for this pattern is $_practiceExpectedValue.\n\nReview how candidate interactions restrict this target cell.";
+
       setState(() {
         _practiceBoard![_practiceHighlightedRow][_practiceHighlightedCol] =
             number;
         _practiceShowError = true;
-        _practiceHelp =
-            "Oops! You entered $number. But according to the rules of $lessonTitle, the correct solution is $_practiceExpectedValue. Check the strategy guide to review the elimination steps.";
+        _practiceHelp = coachExplanation;
         if (_timeAttackActive) {
           _timeAttackTimeLeft = max(0, _timeAttackTimeLeft - 15);
           _timeAttackMistakeCount++;
@@ -450,6 +585,23 @@ class _TutorialScreenState extends State<TutorialScreen>
         }
       });
       _shakeController.forward(from: 0.0);
+
+      _showCoachTipSheet(
+        strategyTitle: lessonTitle,
+        explanation: coachExplanation,
+        onRetry: () {
+          setState(() {
+            _practiceBoard![_practiceHighlightedRow][_practiceHighlightedCol] =
+                0;
+            _practiceShowError = false;
+          });
+        },
+        onShowHint: () {
+          setState(() {
+            _practiceShowHint = true;
+          });
+        },
+      );
     }
   }
 
