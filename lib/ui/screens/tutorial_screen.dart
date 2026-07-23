@@ -977,6 +977,8 @@ class _TutorialScreenState extends State<TutorialScreen>
           if (slide.expectedValue != null && !_isSolved)
             _buildTutorialNumpad(onTap: _handleNumpadTap),
           const SizedBox(height: 16),
+          _buildBoardColorLegendBar(slide),
+          const SizedBox(height: 12),
           _buildFeedbackBanner(
             isSolved: _isSolved,
             showErrorHint: _showErrorHint,
@@ -984,34 +986,7 @@ class _TutorialScreenState extends State<TutorialScreen>
             expectedValue: slide.expectedValue,
           ),
           const SizedBox(height: 16),
-          Card(
-            elevation: 1,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Step ${_currentSlideIndex + 1} of ${lesson.slides.length}',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    slide.text,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _buildStrategyBreakdownCard(slide, lesson),
           const SizedBox(height: 24),
           _buildPaginationControls(lessons),
           const SizedBox(height: 24),
@@ -1020,6 +995,213 @@ class _TutorialScreenState extends State<TutorialScreen>
     );
   }
 
+  Widget _buildBoardColorLegendBar(SlideData slide) {
+    final theme = Theme.of(context);
+    final List<Widget> legendChips = [];
+
+    if (slide.expectedValue != null) {
+      legendChips.add(
+        _buildLegendChip(
+          context,
+          label: 'Target Cell',
+          color: theme.colorScheme.primaryContainer,
+        ),
+      );
+    }
+    if (slide.customHighlights != null) {
+      legendChips.add(
+        _buildLegendChip(
+          context,
+          label: 'Pattern Highlights',
+          color: theme.colorScheme.secondaryContainer,
+        ),
+      );
+    }
+    if (slide.links != null && slide.links!.isNotEmpty) {
+      legendChips.add(
+        _buildLegendChip(
+          context,
+          label: 'Strong Link',
+          color: Colors.teal.shade500,
+        ),
+      );
+      legendChips.add(
+        _buildLegendChip(
+          context,
+          label: 'Weak Link',
+          color: Colors.deepOrange.shade400,
+        ),
+      );
+    }
+
+    if (legendChips.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        alignment: WrapAlignment.center,
+        children: legendChips,
+      ),
+    );
+  }
+
+  Widget _buildLegendChip(
+    BuildContext context, {
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStrategyBreakdownCard(SlideData slide, LessonData lesson) {
+    final theme = Theme.of(context);
+    final bool hasExpected = slide.expectedValue != null;
+    final String targetDigitText =
+        hasExpected ? "Digit ${slide.expectedValue}" : "Candidate Pattern";
+
+    return Card(
+      elevation: 1,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.psychology_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'STRATEGY BREAKDOWN',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Step ${_currentSlideIndex + 1} of ${lesson.slides.length}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _buildTakeawayRow(
+              context,
+              icon: Icons.search_rounded,
+              title: 'What to Look For',
+              desc:
+                  'Inspect highlighted cells and candidates for $targetDigitText.',
+              color: theme.colorScheme.secondary,
+            ),
+            const SizedBox(height: 10),
+            _buildTakeawayRow(
+              context,
+              icon: Icons.rule_rounded,
+              title: 'Strategy Rule',
+              desc: slide.text,
+              color: theme.colorScheme.primary,
+            ),
+            if (hasExpected) ...[
+              const SizedBox(height: 10),
+              _buildTakeawayRow(
+                context,
+                icon: Icons.track_changes_rounded,
+                title: 'Elimination & Placement',
+                desc:
+                    'Place digit ${slide.expectedValue} in Row ${slide.highlightedRow + 1}, Col ${slide.highlightedCol + 1}.',
+                color: Colors.green,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTakeawayRow(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String desc,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$title:',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
   Widget _buildPracticeTab(List<LessonData> lessons) {
     final theme = Theme.of(context);
     final lessonTitle = lessons[_practiceLessonIndex].title;
