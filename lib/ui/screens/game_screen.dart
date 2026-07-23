@@ -234,12 +234,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return;
     }
 
-    final String explanation = SudokuAnalyzer.analyzeCell(
+    final hintResult = SudokuAnalyzer.analyzeCellDetailed(
       _provider.currentBoard,
       r,
       c,
       correctVal,
+      context,
     );
+    _provider.setHintVisuals(hintResult.customHighlights, hintResult.links);
 
     showDialog(
       context: context,
@@ -275,7 +277,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                explanation,
+                hintResult.text,
                 style: TextStyle(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 14,
@@ -300,6 +302,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               onPressed: () {
                 Navigator.pop(context);
                 _provider.revealHint();
+                _provider.clearHintVisuals();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
@@ -353,6 +356,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             showMistakes: _provider.showMistakes,
                             flashRow: _provider.flashRow,
                             flashCol: _provider.flashCol,
+                            customCellBgs: _provider.activeHintHighlights,
                             onCellTap: (r, c) {
                               _provider.selectCell(r, c);
                             },

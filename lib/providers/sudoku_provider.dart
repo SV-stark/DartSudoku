@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/sudoku_logic.dart';
 import '../core/stats_manager.dart';
@@ -105,6 +105,27 @@ class SudokuGameProvider extends ChangeNotifier {
   bool get highlightIdentical => SettingsProvider.instance.highlightIdentical;
   bool get endlessMode => SettingsProvider.instance.endlessMode;
   bool get autoRemoveNotes => SettingsProvider.instance.autoRemoveNotes;
+
+  Map<String, Color> _activeHintHighlights = {};
+  List<List<String>> _activeHintLinks = [];
+
+  Map<String, Color> get activeHintHighlights => _activeHintHighlights;
+  List<List<String>> get activeHintLinks => _activeHintLinks;
+
+  void setHintVisuals(
+    Map<String, Color> highlights,
+    List<List<String>> links,
+  ) {
+    _activeHintHighlights = highlights;
+    _activeHintLinks = links;
+    notifyListeners();
+  }
+
+  void clearHintVisuals() {
+    _activeHintHighlights = {};
+    _activeHintLinks = [];
+    notifyListeners();
+  }
 
   Map<int, int> get numberCounts => _numberCounts;
   int get totalClues => _totalClues;

@@ -1,5 +1,69 @@
+import 'package:flutter/material.dart';
+
+/// Detailed result of a cell strategy hint analysis including visual annotations.
+class HintAnalysisResult {
+  final String text;
+  final Map<String, Color> customHighlights;
+  final List<List<String>> links;
+
+  HintAnalysisResult({
+    required this.text,
+    this.customHighlights = const {},
+    this.links = const [],
+  });
+}
+
 /// Analyzes board configurations to provide educational explanations for cell values.
 class SudokuAnalyzer {
+  /// Analyzes the selected empty cell (row, col) on [currentBoard] and returns
+  /// detailed visual hint annotations.
+  static HintAnalysisResult analyzeCellDetailed(
+    List<List<int>> currentBoard,
+    int row,
+    int col,
+    int correctVal,
+    BuildContext context,
+  ) {
+    final theme = Theme.of(context);
+    final explanation = analyzeCell(currentBoard, row, col, correctVal);
+    final highlights = <String, Color>{};
+    final links = <List<String>>[];
+
+    // Target cell highlight
+    highlights['$row,$col'] = theme.colorScheme.primaryContainer;
+
+    // Highlight row/col/box related cells based on technique type
+    if (explanation.contains('Row')) {
+      for (int c = 0; c < 9; c++) {
+        if (c != col && currentBoard[row][c] == 0) {
+          highlights['$row,$c'] = theme.colorScheme.secondaryContainer.withValues(alpha: 0.4);
+        }
+      }
+    } else if (explanation.contains('Column')) {
+      for (int r = 0; r < 9; r++) {
+        if (r != row && currentBoard[r][col] == 0) {
+          highlights['$r,$col'] = theme.colorScheme.secondaryContainer.withValues(alpha: 0.4);
+        }
+      }
+    } else if (explanation.contains('3x3 Box') || explanation.contains('Block')) {
+      int boxR = row - row % 3;
+      int boxC = col - col % 3;
+      for (int r = boxR; r < boxR + 3; r++) {
+        for (int c = boxC; c < boxC + 3; c++) {
+          if ((r != row || c != col) && currentBoard[r][c] == 0) {
+            highlights['$r,$c'] = theme.colorScheme.secondaryContainer.withValues(alpha: 0.4);
+          }
+        }
+      }
+    }
+
+    return HintAnalysisResult(
+      text: explanation,
+      customHighlights: highlights,
+      links: links,
+    );
+  }
+
   /// Analyzes the selected empty cell (row, col) on [currentBoard] and returns
   /// a logical explanation of why [correctVal] is the correct number.
   static String analyzeCell(

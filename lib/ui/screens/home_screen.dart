@@ -11,6 +11,7 @@ import 'solver_screen.dart';
 import 'stats_screen.dart';
 import 'daily_challenge_screen.dart';
 import 'tutorial_screen.dart';
+import 'designer_screen.dart';
 import 'settings_sheet.dart';
 
 /// The entry screen of the application offering play options and the solver utility.
@@ -113,6 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Tutorial Card
                   _buildTutorialCard(context),
+                  const SizedBox(height: 16),
+
+                  // Designer & Exporter Card
+                  _buildDesignerCard(context),
                 ],
               ),
             ),
@@ -509,6 +514,66 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openTutorial() {
     Navigator.push(context, FadePageRoute(child: const TutorialScreen()));
+  }
+
+  void _openDesigner() {
+    AudioService.playCellSelect();
+    Navigator.push(context, FadePageRoute(child: const DesignerScreen()));
+  }
+
+  Widget _buildDesignerCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 2,
+      child: InkWell(
+        onTap: _openDesigner,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.dashboard_customize_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Puzzle Designer & Exporter',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Design custom puzzles, validate unique solutions in real-time, and export printable vector worksheets with answer keys.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildDailyChallengeCard(BuildContext context) {
