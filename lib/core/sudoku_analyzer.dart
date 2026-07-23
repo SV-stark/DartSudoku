@@ -559,10 +559,12 @@ class SudokuAnalyzer {
           final cols2 = <int>[];
 
           for (int c = 0; c < 9; c++) {
-            if (board[r1][c] == 0 && candidates[r1][c].contains(d))
+            if (board[r1][c] == 0 && candidates[r1][c].contains(d)) {
               cols1.add(c);
-            if (board[r2][c] == 0 && candidates[r2][c].contains(d))
+            }
+            if (board[r2][c] == 0 && candidates[r2][c].contains(d)) {
               cols2.add(c);
+            }
           }
 
           if (cols1.length == 2 &&
@@ -607,10 +609,12 @@ class SudokuAnalyzer {
           final rows2 = <int>[];
 
           for (int r = 0; r < 9; r++) {
-            if (board[r][c1] == 0 && candidates[r][c1].contains(d))
+            if (board[r][c1] == 0 && candidates[r][c1].contains(d)) {
               rows1.add(r);
-            if (board[r][c2] == 0 && candidates[r][c2].contains(d))
+            }
+            if (board[r][c2] == 0 && candidates[r][c2].contains(d)) {
               rows2.add(r);
+            }
           }
 
           if (rows1.length == 2 &&

@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../data/prefs_keys.dart';
 
 /// Manages reproducible daily challenge seed puzzles, completion calendar, and streak tracking.
 class DailyChallengeManager {
