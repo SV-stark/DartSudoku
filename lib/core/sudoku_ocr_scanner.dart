@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Sudoku string & grid importer utility for custom grids.
 class SudokuOCRScanner {
   /// Parses an 81-character SDK string (or formatted line with dots/zeros for blank cells).
