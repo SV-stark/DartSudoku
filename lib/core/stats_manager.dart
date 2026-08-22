@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -121,6 +122,20 @@ class GameStats {
 class StatsManager {
   static const String _key = PrefsKeys.stats;
   static SharedPreferences? _prefs;
+  static Future<void> _lock = Future.value();
+
+  static Future<T> _synchronized<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _lock = _lock.then((_) async {
+      try {
+        final result = await action();
+        completer.complete(result);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
 
   static Future<SharedPreferences> _getPrefs() async {
     if (_prefs != null) return _prefs!;
@@ -158,74 +173,82 @@ class StatsManager {
     }
   }
 
-  /// Increment played games for a difficulty level
-  static Future<void> recordGameStart(Difficulty difficulty) async {
-    final stats = await getStats();
-    stats.difficultyStats[difficulty.name]?.gamesPlayed++;
-    await saveStats(stats);
+  /// Increment played games for a difficulty level safely
+  static Future<void> recordGameStart(Difficulty difficulty) {
+    return _synchronized(() async {
+      final stats = await getStats();
+      stats.difficultyStats[difficulty.name]?.gamesPlayed++;
+      await saveStats(stats);
+    });
   }
 
-  /// Increment won games, update best/total time, and update win streaks
-  static Future<void> recordGameWin(Difficulty difficulty, int seconds) async {
-    final stats = await getStats();
-    final diff = difficulty.name;
-    final diffStats = stats.difficultyStats[diff]!;
+  /// Increment won games, update best/total time, and update win streaks safely
+  static Future<void> recordGameWin(Difficulty difficulty, int seconds) {
+    return _synchronized(() async {
+      final stats = await getStats();
+      final diff = difficulty.name;
+      final diffStats = stats.difficultyStats[diff]!;
 
-    diffStats.gamesWon++;
-    diffStats.totalTime += seconds;
+      diffStats.gamesWon++;
+      diffStats.totalTime += seconds;
 
-    if (diffStats.bestTime == 0 || seconds < diffStats.bestTime) {
-      diffStats.bestTime = seconds;
-    }
+      if (diffStats.bestTime == 0 || seconds < diffStats.bestTime) {
+        diffStats.bestTime = seconds;
+      }
 
-    final now = DateTime.now();
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final dateStr = '${months[now.month - 1]} ${now.day}, ${now.year}';
+      final now = DateTime.now();
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      final dateStr = '${months[now.month - 1]} ${now.day}, ${now.year}';
 
-    final record = TimeRecord(timeInSeconds: seconds, date: dateStr);
-    diffStats.topTimes.add(record);
-    diffStats.topTimes.sort(
-      (a, b) => a.timeInSeconds.compareTo(b.timeInSeconds),
-    );
-    if (diffStats.topTimes.length > 5) {
-      diffStats.topTimes = diffStats.topTimes.sublist(0, 5);
-    }
+      final record = TimeRecord(timeInSeconds: seconds, date: dateStr);
+      diffStats.topTimes.add(record);
+      diffStats.topTimes.sort(
+        (a, b) => a.timeInSeconds.compareTo(b.timeInSeconds),
+      );
+      if (diffStats.topTimes.length > 5) {
+        diffStats.topTimes = diffStats.topTimes.sublist(0, 5);
+      }
 
-    stats.currentStreak++;
-    if (stats.currentStreak > stats.maxStreak) {
-      stats.maxStreak = stats.currentStreak;
-    }
+      stats.currentStreak++;
+      if (stats.currentStreak > stats.maxStreak) {
+        stats.maxStreak = stats.currentStreak;
+      }
 
-    await saveStats(stats);
+      await saveStats(stats);
+    });
   }
 
-  /// Reset the current win streak to 0
-  static Future<void> recordGameLoss() async {
-    final stats = await getStats();
-    stats.currentStreak = 0;
-    await saveStats(stats);
+  /// Reset the current win streak to 0 safely
+  static Future<void> recordGameLoss() {
+    return _synchronized(() async {
+      final stats = await getStats();
+      stats.currentStreak = 0;
+      await saveStats(stats);
+    });
   }
 
-  /// Clear all stats history
-  static Future<void> resetStats() async {
-    try {
-      final prefs = await _getPrefs();
-      await prefs.remove(_key);
-    } catch (e, stack) {
-      debugPrint('Error resetting stats in StatsManager: $e\n$stack');
-    }
+  /// Clear all stats history safely
+  static Future<void> resetStats() {
+    return _synchronized(() async {
+      try {
+        final prefs = await _getPrefs();
+        await prefs.remove(_key);
+      } catch (e, stack) {
+        debugPrint('Error resetting stats in StatsManager: $e\n$stack');
+      }
+    });
   }
 }

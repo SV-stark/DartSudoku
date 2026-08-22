@@ -43,7 +43,7 @@ void main() {
       expect(provider.solverBoard[4][4], 0);
     });
 
-    test('solveComplete solves a valid partially filled board', () {
+    test('solveComplete solves a valid partially filled board', () async {
       final provider = SudokuSolverProvider();
       // Setup a simple valid board structure (from a known solvable puzzle)
       // We will place a few numbers
@@ -68,7 +68,7 @@ void main() {
       provider.selectCell(2, 7);
       provider.enterNumber(6);
 
-      provider.solveComplete();
+      await provider.solveComplete();
       expect(provider.status, SolverStatus.solved);
       expect(provider.errorMessage, isNull);
 
@@ -80,25 +80,21 @@ void main() {
       }
     });
 
-    test('solveComplete handles invalid layout duplicate rule violations', () {
+    test('solveComplete handles invalid layout duplicate rule violations', () async {
       final provider = SudokuSolverProvider();
       provider.selectCell(0, 0);
       provider.enterNumber(5);
       provider.selectCell(0, 1);
       provider.enterNumber(5); // Conflict in row 0
 
-      provider.solveComplete();
+      await provider.solveComplete();
       expect(provider.status, SolverStatus.error);
       expect(provider.errorMessage, contains('violations'));
     });
 
-    test('solveComplete handles unsolvable board configurations', () {
+    test('solveComplete handles unsolvable board configurations', () async {
       final provider = SudokuSolverProvider();
       // Input a board configuration that has no duplicates, but cannot be solved
-      // Row 0 has 2, 3, 4, 5, 6, 7, 8, 9 starting at col 1.
-      // So (0, 0) must be 1.
-      // But row 8 has 1 at col 0, meaning (8, 0) is 1. This blocks (0, 0) from being 1.
-      // So cell (0, 0) has no valid candidates, making the board unsolvable.
       provider.selectCell(0, 1);
       provider.enterNumber(2);
       provider.selectCell(0, 2);
@@ -118,12 +114,12 @@ void main() {
       provider.selectCell(8, 0);
       provider.enterNumber(1);
 
-      provider.solveComplete();
+      await provider.solveComplete();
       expect(provider.status, SolverStatus.error);
       expect(provider.errorMessage, contains('unsolvable'));
     });
 
-    test('solveSelectedCell solves only the selected coordinate', () {
+    test('solveSelectedCell solves only the selected coordinate', () async {
       final provider = SudokuSolverProvider();
       provider.selectCell(0, 0);
       provider.enterNumber(5);
@@ -134,7 +130,7 @@ void main() {
 
       // Select an empty cell to solve
       provider.selectCell(0, 2);
-      provider.solveSelectedCell();
+      await provider.solveSelectedCell();
 
       expect(
         provider.status,
@@ -153,7 +149,7 @@ void main() {
       expect(filledCount, 4); // 3 original + 1 solved cell
     });
 
-    test('solveStepWise solves a single cell at a time and provides explanation', () {
+    test('solveStepWise solves a single cell at a time and provides explanation', () async {
       final provider = SudokuSolverProvider();
       provider.selectCell(0, 0);
       provider.enterNumber(5);
@@ -162,7 +158,7 @@ void main() {
       provider.selectCell(0, 4);
       provider.enterNumber(7);
 
-      provider.solveStepWise();
+      await provider.solveStepWise();
 
       expect(provider.status, SolverStatus.idle);
       expect(provider.stepExplanation, isNotNull);
@@ -182,19 +178,19 @@ void main() {
       expect(filledCount, 4);
     });
 
-    test('solveStepWise handles invalid layout duplicate rule violations', () {
+    test('solveStepWise handles invalid layout duplicate rule violations', () async {
       final provider = SudokuSolverProvider();
       provider.selectCell(0, 0);
       provider.enterNumber(5);
       provider.selectCell(0, 1);
       provider.enterNumber(5); // Conflict in row 0
 
-      provider.solveStepWise();
+      await provider.solveStepWise();
       expect(provider.status, SolverStatus.error);
       expect(provider.errorMessage, contains('violations'));
     });
 
-    test('solveStepWise handles unsolvable board configurations', () {
+    test('solveStepWise handles unsolvable board configurations', () async {
       final provider = SudokuSolverProvider();
       provider.selectCell(0, 1);
       provider.enterNumber(2);
@@ -215,12 +211,12 @@ void main() {
       provider.selectCell(8, 0);
       provider.enterNumber(1);
 
-      provider.solveStepWise();
+      await provider.solveStepWise();
       expect(provider.status, SolverStatus.error);
       expect(provider.errorMessage, contains('unsolvable'));
     });
 
-    test('solveStepWise handles already completed boards', () {
+    test('solveStepWise handles already completed boards', () async {
       final provider = SudokuSolverProvider();
       // Solve a valid puzzle completely first
       provider.selectCell(0, 0);
@@ -244,11 +240,11 @@ void main() {
       provider.selectCell(2, 7);
       provider.enterNumber(6);
 
-      provider.solveComplete();
+      await provider.solveComplete();
       expect(provider.status, SolverStatus.solved);
 
       // Now call solveStepWise
-      provider.solveStepWise();
+      await provider.solveStepWise();
       expect(provider.status, SolverStatus.error);
       expect(provider.errorMessage, contains('already fully solved'));
     });

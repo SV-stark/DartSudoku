@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/services/audio_service.dart';
 import '../data/prefs_keys.dart';
 
 /// Manages gameplay assistance settings and their persistence.
@@ -11,6 +12,8 @@ class SettingsProvider extends ChangeNotifier {
   bool _highlightIdentical = true;
   bool _endlessMode = false;
   bool _autoRemoveNotes = true;
+  bool _soundEnabled = true;
+  bool _hapticsEnabled = true;
 
   SettingsProvider._() {
     loadSettings();
@@ -22,6 +25,8 @@ class SettingsProvider extends ChangeNotifier {
   bool get highlightIdentical => _highlightIdentical;
   bool get endlessMode => _endlessMode;
   bool get autoRemoveNotes => _autoRemoveNotes;
+  bool get soundEnabled => _soundEnabled;
+  bool get hapticsEnabled => _hapticsEnabled;
 
   /// Loads assistance settings from SharedPreferences.
   Future<void> loadSettings() async {
@@ -32,6 +37,12 @@ class SettingsProvider extends ChangeNotifier {
       _highlightIdentical = prefs.getBool(PrefsKeys.highlightIdentical) ?? true;
       _endlessMode = prefs.getBool(PrefsKeys.endlessMode) ?? false;
       _autoRemoveNotes = prefs.getBool(PrefsKeys.autoRemoveNotes) ?? true;
+      _soundEnabled = prefs.getBool(PrefsKeys.soundEnabled) ?? true;
+      _hapticsEnabled = prefs.getBool(PrefsKeys.hapticsEnabled) ?? true;
+
+      AudioService.soundEnabled = _soundEnabled;
+      AudioService.hapticsEnabled = _hapticsEnabled;
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading settings in SettingsProvider: $e');
@@ -45,6 +56,8 @@ class SettingsProvider extends ChangeNotifier {
     bool? highlightIdentical,
     bool? endlessMode,
     bool? autoRemoveNotes,
+    bool? soundEnabled,
+    bool? hapticsEnabled,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -67,6 +80,16 @@ class SettingsProvider extends ChangeNotifier {
       if (autoRemoveNotes != null) {
         _autoRemoveNotes = autoRemoveNotes;
         await prefs.setBool(PrefsKeys.autoRemoveNotes, autoRemoveNotes);
+      }
+      if (soundEnabled != null) {
+        _soundEnabled = soundEnabled;
+        AudioService.soundEnabled = soundEnabled;
+        await prefs.setBool(PrefsKeys.soundEnabled, soundEnabled);
+      }
+      if (hapticsEnabled != null) {
+        _hapticsEnabled = hapticsEnabled;
+        AudioService.hapticsEnabled = hapticsEnabled;
+        await prefs.setBool(PrefsKeys.hapticsEnabled, hapticsEnabled);
       }
       notifyListeners();
     } catch (e) {

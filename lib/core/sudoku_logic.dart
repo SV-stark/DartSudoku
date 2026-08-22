@@ -253,9 +253,20 @@ class SudokuLogic {
         if (c < 8 && !visited.contains('$r,${c + 1}')) {
           cells.add(Point(r, c + 1));
           visited.add('$r,${c + 1}');
+          if (c < 7 && !visited.contains('$r,${c + 2}') && cageId % 3 == 0) {
+            cells.add(Point(r, c + 2));
+            visited.add('$r,${c + 2}');
+          } else if (r < 8 && !visited.contains('${r + 1},${c + 1}') && cageId % 3 == 1) {
+            cells.add(Point(r + 1, c + 1));
+            visited.add('${r + 1},${c + 1}');
+          }
         } else if (r < 8 && !visited.contains('${r + 1},$c')) {
           cells.add(Point(r + 1, c));
           visited.add('${r + 1},$c');
+          if (r < 7 && !visited.contains('${r + 2},$c') && cageId % 3 == 0) {
+            cells.add(Point(r + 2, c));
+            visited.add('${r + 2},$c');
+          }
         }
 
         int targetSum = cells.fold(0, (sum, p) => sum + solvedBoard[p.x][p.y]);

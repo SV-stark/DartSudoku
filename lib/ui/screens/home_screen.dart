@@ -3,10 +3,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/prefs_keys.dart';
 import '../../providers/settings_provider.dart';
 import '../../core/difficulty.dart';
+import '../../core/sudoku_logic.dart';
 import '../../core/services/audio_service.dart';
 import '../../core/achievements_manager.dart';
 import '../theme.dart';
 import 'game_screen.dart';
+
 import 'solver_screen.dart';
 import 'stats_screen.dart';
 import 'daily_challenge_screen.dart';
@@ -25,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late SettingsProvider _settingsProvider;
   bool _isTodayCompleted = false;
+  SudokuVariant _selectedVariant = SudokuVariant.standard;
   bool _hasSavedGame = false;
   String _savedDifficulty = '';
   int _savedElapsedTime = 0;
@@ -371,12 +374,45 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Challenge yourself with standard game boards featuring unique, solvable solutions.',
+              'Challenge yourself with standard or variant game boards featuring unique solutions.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Standard'),
+                  selected: _selectedVariant == SudokuVariant.standard,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => _selectedVariant = SudokuVariant.standard);
+                    }
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('Diagonal X'),
+                  selected: _selectedVariant == SudokuVariant.diagonalX,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => _selectedVariant = SudokuVariant.diagonalX);
+                    }
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('Killer'),
+                  selected: _selectedVariant == SudokuVariant.killer,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => _selectedVariant = SudokuVariant.killer);
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             _buildDifficultyButton(
               context,
               label: 'EASY',
@@ -490,7 +526,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void _startGame(Difficulty difficulty) {
     Navigator.push(
       context,
-      FadePageRoute(child: GameScreen(difficulty: difficulty)),
+      FadePageRoute(
+        child: GameScreen(
+          difficulty: difficulty,
+          variant: _selectedVariant,
+        ),
+      ),
     ).then((_) => _checkSavedGame());
   }
 

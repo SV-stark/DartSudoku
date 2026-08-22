@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/prefs_keys.dart';
 import '../../providers/sudoku_provider.dart';
 import '../../core/difficulty.dart';
+import '../../core/sudoku_logic.dart';
 import '../../core/sudoku_analyzer.dart';
 import '../../core/services/audio_service.dart';
 import '../../core/daily_challenge_manager.dart';
@@ -21,12 +22,14 @@ import '../../providers/settings_provider.dart';
 class GameScreen extends StatefulWidget {
   final Difficulty difficulty;
   final String? dailyChallengeDate;
+  final SudokuVariant variant;
   final bool resumeSavedGame;
 
   const GameScreen({
     super.key,
     required this.difficulty,
     this.dailyChallengeDate,
+    this.variant = SudokuVariant.standard,
     this.resumeSavedGame = false,
   });
 
@@ -46,15 +49,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _provider.addListener(_onStateChange);
     _focusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (widget.resumeSavedGame) {
-        await _provider.loadSavedGame();
-      } else {
-        _provider.newGame(
-          widget.difficulty,
-          dailyDate: widget.dailyChallengeDate,
-        );
+      try {
+        if (widget.resumeSavedGame) {
+          await _provider.loadSavedGame();
+        } else {
+          await _provider.newGame(
+            widget.difficulty,
+            dailyDate: widget.dailyChallengeDate,
+            variant: widget.variant,
+          );
+        }
+      } catch (e, stack) {
+        debugPrint('Error starting game in GameScreen: $e\n$stack');
       }
-      _focusNode.requestFocus();
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
     });
   }
 
@@ -81,9 +91,26 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         if (_provider.elapsedSeconds < 180) {
           AchievementsManager.unlock('speed_demon');
         }
+        if (widget.difficulty == Difficulty.hard && _provider.hintsUsed == 0) {
+          AchievementsManager.unlock('master_tactician');
+        }
         if (widget.dailyChallengeDate != null) {
           _recordDailyChallengeSuccess();
-          DailyChallengeManager.markDateCompleted(DateTime.now());
+          try {
+            final parts = widget.dailyChallengeDate!.split('-');
+            if (parts.length == 3) {
+              final challengeDate = DateTime(
+                int.parse(parts[0]),
+                int.parse(parts[1]),
+                int.parse(parts[2]),
+              );
+              DailyChallengeManager.markDateCompleted(challengeDate);
+            } else {
+              DailyChallengeManager.markDateCompleted(DateTime.now());
+            }
+          } catch (_) {
+            DailyChallengeManager.markDateCompleted(DateTime.now());
+          }
         }
       } else if (_provider.status == GameStatus.gameOver) {
         AudioService.playError();
@@ -877,7 +904,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'You committed 3 mistakes and terminated the board.',
+                        'You committed ${_provider.maxMistakes} mistakes and terminated the board.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -895,8 +922,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           const SizedBox(width: 12),
                           Expanded(
                             child: FilledButton(
-                              onPressed: () =>
-                                  _provider.newGame(widget.difficulty),
+                              onPressed: () => _provider.newGame(
+                                widget.difficulty,
+                                variant: widget.variant,
+                                dailyDate: widget.dailyChallengeDate,
+                              ),
                               style: FilledButton.styleFrom(
                                 backgroundColor: theme.colorScheme.error,
                                 foregroundColor: theme.colorScheme.onError,
@@ -965,7 +995,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           ReplayDialog.show(
                             context,
                             moveHistory: _provider.moveHistory,
-                            initialBoard: _provider.solvedBoard,
+                            initialBoard: _provider.initialBoard,
                             isClue: _provider.isOriginalClue,
                           );
                         },
@@ -987,8 +1017,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           const SizedBox(width: 12),
                           Expanded(
                             child: FilledButton(
-                              onPressed: () =>
-                                  _provider.newGame(widget.difficulty),
+                              onPressed: () => _provider.newGame(
+                                widget.difficulty,
+                                variant: widget.variant,
+                                dailyDate: widget.dailyChallengeDate,
+                              ),
                               child: const Text('PLAY AGAIN'),
                             ),
                           ),

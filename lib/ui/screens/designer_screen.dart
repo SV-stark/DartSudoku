@@ -4,6 +4,7 @@ import '../../core/pdf_exporter.dart';
 import '../../core/services/audio_service.dart';
 import '../components/sudoku_grid.dart';
 import '../components/numpad.dart';
+import '../components/custom_answers_dialog.dart';
 
 /// Screen allowing players to design custom Sudoku boards, validate uniqueness, and export printable sheets.
 class DesignerScreen extends StatefulWidget {
@@ -12,6 +13,7 @@ class DesignerScreen extends StatefulWidget {
   @override
   State<DesignerScreen> createState() => _DesignerScreenState();
 }
+
 
 class _DesignerScreenState extends State<DesignerScreen> {
   final List<List<int>> _grid = List.generate(9, (_) => List.filled(9, 0));
@@ -149,6 +151,11 @@ class _DesignerScreenState extends State<DesignerScreen> {
         title: const Text('Custom Puzzle Designer'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.rule_folder_rounded),
+            tooltip: 'Inspect Full Answers & Breakdown',
+            onPressed: () => CustomAnswersDialog.show(context, _grid),
+          ),
+          IconButton(
             icon: const Icon(Icons.print_rounded),
             tooltip: 'Export Printable Worksheet',
             onPressed: _exportPrintableSheet,
@@ -159,6 +166,7 @@ class _DesignerScreenState extends State<DesignerScreen> {
             onPressed: _clearBoard,
           ),
         ],
+
       ),
       body: SafeArea(
         child: SingleChildScrollView(

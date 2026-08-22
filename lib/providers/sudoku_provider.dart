@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/sudoku_logic.dart';
@@ -15,8 +16,13 @@ import 'settings_provider.dart';
 class BoardState {
   final List<List<int>> board;
   final List<List<Set<int>>> notes;
+  final int mistakes;
 
-  BoardState({required this.board, required this.notes});
+  BoardState({
+    required this.board,
+    required this.notes,
+    required this.mistakes,
+  });
 }
 
 /// Record of an individual move for replay and hesitation heatmap calculation.
@@ -46,6 +52,10 @@ class SudokuGameProvider extends ChangeNotifier {
   final ChangeNotifier selectionNotifier = ChangeNotifier();
   final ChangeNotifier timerNotifier = ChangeNotifier();
 
+  List<List<int>> _initialBoard = List.generate(
+    GameConstants.boardSize,
+    (_) => List.filled(GameConstants.boardSize, 0),
+  );
   List<List<int>> _currentBoard = List.generate(
     GameConstants.boardSize,
     (_) => List.filled(GameConstants.boardSize, 0),
@@ -64,7 +74,9 @@ class SudokuGameProvider extends ChangeNotifier {
   );
 
   // Unmodifiable cached representations to expose to UI safely
+  List<List<int>> _unmodifiableInitialBoard = [];
   List<List<int>> _unmodifiableCurrentBoard = [];
+  List<List<int>> _unmodifiableSolvedBoard = [];
   List<List<bool>> _unmodifiableIsOriginalClue = [];
   List<List<Set<int>>> _unmodifiableNotes = [];
 
@@ -72,6 +84,7 @@ class SudokuGameProvider extends ChangeNotifier {
   int _selectedCol = -1;
 
   int _mistakes = 0;
+  int _hintsUsed = 0;
   Difficulty _difficulty = Difficulty.easy;
   String? _dailyChallengeDate;
   GameStatus _status = GameStatus.idle;
@@ -79,6 +92,7 @@ class SudokuGameProvider extends ChangeNotifier {
   bool _notesMode = false;
   int _elapsedSeconds = 0;
   Timer? _timer;
+  Timer? _flashTimer;
 
   final List<BoardState> _undoHistory = [];
   final List<BoardState> _redoHistory = [];
@@ -117,14 +131,16 @@ class SudokuGameProvider extends ChangeNotifier {
   }
 
   // Getters for internal boards (Unmodifiable views)
+  List<List<int>> get initialBoard => _unmodifiableInitialBoard;
   List<List<int>> get currentBoard => _unmodifiableCurrentBoard;
-  List<List<int>> get solvedBoard => _solvedBoard; // Used internally/by test
+  List<List<int>> get solvedBoard => _unmodifiableSolvedBoard;
   List<List<bool>> get isOriginalClue => _unmodifiableIsOriginalClue;
   List<List<Set<int>>> get notes => _unmodifiableNotes;
 
   int get selectedRow => _selectedRow;
   int get selectedCol => _selectedCol;
   int get mistakes => _mistakes;
+  int get hintsUsed => _hintsUsed;
   int get maxMistakes => GameConstants.maxMistakes;
   Difficulty get difficulty => _difficulty;
   GameStatus get status => _status;
@@ -286,6 +302,7 @@ class SudokuGameProvider extends ChangeNotifier {
     _dailyChallengeDate = dailyDate;
     _activeVariant = variant;
     _killerCages = puzzle.cages;
+    _initialBoard = SudokuLogic.copyBoard(puzzle.puzzleBoard);
     _currentBoard = SudokuLogic.copyBoard(puzzle.puzzleBoard);
     _solvedBoard = SudokuLogic.copyBoard(puzzle.solvedBoard);
     _isOriginalClue = List.generate(
@@ -303,6 +320,7 @@ class SudokuGameProvider extends ChangeNotifier {
     _selectedRow = -1;
     _selectedCol = -1;
     _mistakes = 0;
+    _hintsUsed = 0;
     _elapsedSeconds = 0;
     _notesMode = false;
     _undoHistory.clear();
@@ -346,6 +364,7 @@ class SudokuGameProvider extends ChangeNotifier {
             (c) => Set.from(_notes[r][c]),
           ),
         ),
+        mistakes: _mistakes,
       ),
     );
     // Limit history size to prevent excessive memory usage
@@ -355,10 +374,11 @@ class SudokuGameProvider extends ChangeNotifier {
   }
 
   void triggerFlash(int r, int c) {
+    _flashTimer?.cancel();
     _flashRow = r;
     _flashCol = c;
     notifyListeners();
-    Timer(const Duration(milliseconds: 400), () {
+    _flashTimer = Timer(const Duration(milliseconds: 400), () {
       _flashRow = -1;
       _flashCol = -1;
       notifyListeners();
@@ -393,6 +413,7 @@ class SudokuGameProvider extends ChangeNotifier {
             (c) => Set.from(_notes[r][c]),
           ),
         ),
+        mistakes: _mistakes,
       ),
     );
 
@@ -400,6 +421,7 @@ class SudokuGameProvider extends ChangeNotifier {
     final oldBoard = SudokuLogic.copyBoard(_currentBoard);
     _currentBoard = prevState.board;
     _notes = prevState.notes;
+    _mistakes = prevState.mistakes;
 
     _onBoardStateChanged();
     _findAndFlashDifference(oldBoard, _currentBoard);
@@ -421,6 +443,7 @@ class SudokuGameProvider extends ChangeNotifier {
             (c) => Set.from(_notes[r][c]),
           ),
         ),
+        mistakes: _mistakes,
       ),
     );
 
@@ -428,6 +451,7 @@ class SudokuGameProvider extends ChangeNotifier {
     final oldBoard = SudokuLogic.copyBoard(_currentBoard);
     _currentBoard = nextState.board;
     _notes = nextState.notes;
+    _mistakes = nextState.mistakes;
 
     _onBoardStateChanged();
     _findAndFlashDifference(oldBoard, _currentBoard);
@@ -441,22 +465,22 @@ class SudokuGameProvider extends ChangeNotifier {
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
 
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final durationMs = now - _lastMoveTimeMs;
-    _lastMoveTimeMs = now;
-
-    _moveHistory.add(
-      MoveRecord(
-        timestampMs: now,
-        row: _selectedRow,
-        col: _selectedCol,
-        value: number,
-        isNote: _notesMode,
-        durationMs: durationMs,
-      ),
-    );
-
     if (_notesMode) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final durationMs = now - _lastMoveTimeMs;
+      _lastMoveTimeMs = now;
+
+      _moveHistory.add(
+        MoveRecord(
+          timestampMs: now,
+          row: _selectedRow,
+          col: _selectedCol,
+          value: number,
+          isNote: true,
+          durationMs: durationMs,
+        ),
+      );
+
       // Toggle note
       _saveToHistory();
       if (_notes[_selectedRow][_selectedCol].contains(number)) {
@@ -468,8 +492,23 @@ class SudokuGameProvider extends ChangeNotifier {
       }
       _onBoardStateChanged();
     } else {
-      // Direct number input
+      // Direct number input - check early before recording move
       if (_currentBoard[_selectedRow][_selectedCol] == number) return;
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final durationMs = now - _lastMoveTimeMs;
+      _lastMoveTimeMs = now;
+
+      _moveHistory.add(
+        MoveRecord(
+          timestampMs: now,
+          row: _selectedRow,
+          col: _selectedCol,
+          value: number,
+          isNote: false,
+          durationMs: durationMs,
+        ),
+      );
 
       _saveToHistory();
       _currentBoard[_selectedRow][_selectedCol] = number;
@@ -544,6 +583,7 @@ class SudokuGameProvider extends ChangeNotifier {
     int correctVal = _solvedBoard[_selectedRow][_selectedCol];
     if (_currentBoard[_selectedRow][_selectedCol] == correctVal) return;
 
+    _hintsUsed++;
     _saveToHistory();
     _currentBoard[_selectedRow][_selectedCol] = correctVal;
     _notes[_selectedRow][_selectedCol].clear();
@@ -628,6 +668,7 @@ class SudokuGameProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _flashTimer?.cancel();
     SettingsProvider.instance.removeListener(_onSettingsChanged);
     _stopTimer();
     selectionNotifier.dispose();
@@ -643,8 +684,14 @@ class SudokuGameProvider extends ChangeNotifier {
   }
 
   void _updateUnmodifiableViews() {
+    _unmodifiableInitialBoard = List<List<int>>.unmodifiable(
+      _initialBoard.map((row) => List<int>.unmodifiable(row)),
+    );
     _unmodifiableCurrentBoard = List<List<int>>.unmodifiable(
       _currentBoard.map((row) => List<int>.unmodifiable(row)),
+    );
+    _unmodifiableSolvedBoard = List<List<int>>.unmodifiable(
+      _solvedBoard.map((row) => List<int>.unmodifiable(row)),
     );
     _unmodifiableIsOriginalClue = List<List<bool>>.unmodifiable(
       _isOriginalClue.map((row) => List<bool>.unmodifiable(row)),
@@ -700,6 +747,25 @@ class SudokuGameProvider extends ChangeNotifier {
         await prefs.remove(PrefsKeys.savedDailyDate);
       }
       await prefs.setString(
+        PrefsKeys.savedVariant,
+        _activeVariant.name,
+      );
+      if (_killerCages != null) {
+        final cagesJson = _killerCages!.map((c) => {
+          'id': c.id,
+          'targetSum': c.targetSum,
+          'cells': c.cells.map((p) => [p.x, p.y]).toList(),
+        }).toList();
+        await prefs.setString(PrefsKeys.savedCages, jsonEncode(cagesJson));
+      } else {
+        await prefs.remove(PrefsKeys.savedCages);
+      }
+
+      await prefs.setString(
+        PrefsKeys.savedInitialBoard,
+        jsonEncode(_initialBoard),
+      );
+      await prefs.setString(
         PrefsKeys.savedCurrentBoard,
         jsonEncode(_currentBoard),
       );
@@ -733,6 +799,9 @@ class SudokuGameProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(PrefsKeys.savedDifficulty);
       await prefs.remove(PrefsKeys.savedDailyDate);
+      await prefs.remove(PrefsKeys.savedVariant);
+      await prefs.remove(PrefsKeys.savedCages);
+      await prefs.remove(PrefsKeys.savedInitialBoard);
       await prefs.remove(PrefsKeys.savedCurrentBoard);
       await prefs.remove(PrefsKeys.savedSolvedBoard);
       await prefs.remove(PrefsKeys.savedIsOriginalClue);
@@ -767,6 +836,35 @@ class SudokuGameProvider extends ChangeNotifier {
           ? null
           : dailyDate;
 
+      final variantStr = prefs.getString(PrefsKeys.savedVariant);
+      _activeVariant = (variantStr != null)
+          ? SudokuVariant.values.firstWhere(
+              (v) => v.name == variantStr,
+              orElse: () => SudokuVariant.standard,
+            )
+          : SudokuVariant.standard;
+
+      final cagesStr = prefs.getString(PrefsKeys.savedCages);
+      if (cagesStr != null && cagesStr.isNotEmpty) {
+        final dynamic cagesJson = jsonDecode(cagesStr);
+        if (cagesJson is List) {
+          _killerCages = cagesJson.map<KillerCage>((c) {
+            final cellsList = (c['cells'] as List)
+                .map<Point<int>>((p) => Point<int>(p[0] as int, p[1] as int))
+                .toList();
+            return KillerCage(
+              id: c['id'] as int,
+              targetSum: c['targetSum'] as int,
+              cells: cellsList,
+            );
+          }).toList();
+        } else {
+          _killerCages = null;
+        }
+      } else {
+        _killerCages = null;
+      }
+
       final currentBoardStr =
           prefs.getString(PrefsKeys.savedCurrentBoard) ?? '';
       final solvedBoardStr = prefs.getString(PrefsKeys.savedSolvedBoard) ?? '';
@@ -775,24 +873,36 @@ class SudokuGameProvider extends ChangeNotifier {
       final notesStr = prefs.getString(PrefsKeys.savedNotes) ?? '';
 
       final dynamic currentBoardJson = jsonDecode(currentBoardStr);
+      final dynamic solvedBoardJson = jsonDecode(solvedBoardStr);
+      final dynamic originalClueJson = jsonDecode(originalClueStr);
+      final dynamic notesJson = jsonDecode(notesStr);
+
+      if (currentBoardJson is! List ||
+          currentBoardJson.length != GameConstants.boardSize ||
+          solvedBoardJson is! List ||
+          solvedBoardJson.length != GameConstants.boardSize ||
+          originalClueJson is! List ||
+          originalClueJson.length != GameConstants.boardSize ||
+          notesJson is! List ||
+          notesJson.length != GameConstants.boardSize) {
+        throw const FormatException('Corrupt board matrix in saved game state');
+      }
+
       _currentBoard = List.generate(
         GameConstants.boardSize,
         (r) => List<int>.from(currentBoardJson[r]),
       );
 
-      final dynamic solvedBoardJson = jsonDecode(solvedBoardStr);
       _solvedBoard = List.generate(
         GameConstants.boardSize,
         (r) => List<int>.from(solvedBoardJson[r]),
       );
 
-      final dynamic originalClueJson = jsonDecode(originalClueStr);
       _isOriginalClue = List.generate(
         GameConstants.boardSize,
         (r) => List<bool>.from(originalClueJson[r]),
       );
 
-      final dynamic notesJson = jsonDecode(notesStr);
       _notes = List.generate(
         GameConstants.boardSize,
         (r) => List.generate(
@@ -801,7 +911,36 @@ class SudokuGameProvider extends ChangeNotifier {
         ),
       );
 
+      final initialBoardStr = prefs.getString(PrefsKeys.savedInitialBoard);
+      if (initialBoardStr != null && initialBoardStr.isNotEmpty) {
+        final dynamic initialBoardJson = jsonDecode(initialBoardStr);
+        if (initialBoardJson is List &&
+            initialBoardJson.length == GameConstants.boardSize) {
+          _initialBoard = List.generate(
+            GameConstants.boardSize,
+            (r) => List<int>.from(initialBoardJson[r]),
+          );
+        } else {
+          _initialBoard = List.generate(
+            GameConstants.boardSize,
+            (r) => List.generate(
+              GameConstants.boardSize,
+              (c) => _isOriginalClue[r][c] ? _solvedBoard[r][c] : 0,
+            ),
+          );
+        }
+      } else {
+        _initialBoard = List.generate(
+          GameConstants.boardSize,
+          (r) => List.generate(
+            GameConstants.boardSize,
+            (c) => _isOriginalClue[r][c] ? _solvedBoard[r][c] : 0,
+          ),
+        );
+      }
+
       _mistakes = prefs.getInt(PrefsKeys.savedMistakes) ?? 0;
+      _hintsUsed = 0;
       _elapsedSeconds = prefs.getInt(PrefsKeys.savedElapsedSeconds) ?? 0;
 
       _selectedRow = -1;
@@ -818,6 +957,7 @@ class SudokuGameProvider extends ChangeNotifier {
     } catch (e, stack) {
       debugPrint('Error loading saved game in SudokuGameProvider: $e\n$stack');
       _status = GameStatus.idle;
+      await _clearSavedGame();
       notifyListeners();
     }
   }
@@ -907,8 +1047,8 @@ class SudokuSolverProvider extends ChangeNotifier {
     });
   }
 
-  /// 1st way: Complete solve of the board.
-  void solveComplete() {
+  /// 1st way: Complete solve of the board asynchronously.
+  Future<void> solveComplete() async {
     _errorMessage = null;
     _stepExplanation = null;
 
@@ -924,12 +1064,16 @@ class SudokuSolverProvider extends ChangeNotifier {
     _status = SolverStatus.solving;
     notifyListeners();
 
-    // Create a copy to solve
-    List<List<int>> solvedCopy = SudokuLogic.copyBoard(_solverBoard);
-    bool success = SudokuLogic.solve(solvedCopy);
+    // Create a copy to solve in background isolate
+    final boardCopy = SudokuLogic.copyBoard(_solverBoard);
+    final result = await Isolate.run(() {
+      final solvedCopy = SudokuLogic.copyBoard(boardCopy);
+      final success = SudokuLogic.solve(solvedCopy);
+      return {'success': success, 'solved': solvedCopy};
+    });
 
-    if (success) {
-      _solverBoard = solvedCopy;
+    if (result['success'] == true) {
+      _solverBoard = result['solved'] as List<List<int>>;
       _status = SolverStatus.solved;
     } else {
       _status = SolverStatus.error;
@@ -939,8 +1083,8 @@ class SudokuSolverProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 2nd way: Solve only the selected cell.
-  void solveSelectedCell() {
+  /// 2nd way: Solve only the selected cell asynchronously.
+  Future<void> solveSelectedCell() async {
     _errorMessage = null;
     _stepExplanation = null;
 
@@ -967,16 +1111,22 @@ class SudokuSolverProvider extends ChangeNotifier {
     _status = SolverStatus.solving;
     notifyListeners();
 
-    // Find the value for the selected cell by solving a copy of the board
-    List<List<int>> solvedCopy = SudokuLogic.copyBoard(_solverBoard);
-    bool success = SudokuLogic.solve(solvedCopy);
+    final targetRow = _selectedRow;
+    final targetCol = _selectedCol;
+    final boardCopy = SudokuLogic.copyBoard(_solverBoard);
 
-    if (success) {
-      int solvedVal = solvedCopy[_selectedRow][_selectedCol];
-      _solverBoard[_selectedRow][_selectedCol] = solvedVal;
-      _status =
-          SolverStatus.idle; // return to idle so they can solve more cells
-      triggerFlash(_selectedRow, _selectedCol);
+    final result = await Isolate.run(() {
+      final solvedCopy = SudokuLogic.copyBoard(boardCopy);
+      final success = SudokuLogic.solve(solvedCopy);
+      return {'success': success, 'solved': solvedCopy};
+    });
+
+    if (result['success'] == true) {
+      final solvedCopy = result['solved'] as List<List<int>>;
+      final solvedVal = solvedCopy[targetRow][targetCol];
+      _solverBoard[targetRow][targetCol] = solvedVal;
+      _status = SolverStatus.idle;
+      triggerFlash(targetRow, targetCol);
     } else {
       _status = SolverStatus.error;
       _errorMessage =
@@ -985,8 +1135,8 @@ class SudokuSolverProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 3rd way: Solve stepwise, solving one cell at a time and explaining the technique.
-  void solveStepWise() {
+  /// 3rd way: Solve stepwise, solving one cell at a time and explaining the technique asynchronously.
+  Future<void> solveStepWise() async {
     _errorMessage = null;
     _stepExplanation = null;
 
@@ -1021,22 +1171,24 @@ class SudokuSolverProvider extends ChangeNotifier {
     _status = SolverStatus.solving;
     notifyListeners();
 
-    // Create a copy to solve
-    List<List<int>> solvedCopy = SudokuLogic.copyBoard(_solverBoard);
-    bool success = SudokuLogic.solve(solvedCopy);
+    final boardCopy = SudokuLogic.copyBoard(_solverBoard);
+    final result = await Isolate.run(() {
+      final solvedCopy = SudokuLogic.copyBoard(boardCopy);
+      final success = SudokuLogic.solve(solvedCopy);
+      if (!success) {
+        return {'success': false};
+      }
 
-    if (success) {
-      // Find the cell with the fewest candidates (MRV heuristic)
       int targetRow = -1;
       int targetCol = -1;
       int minOptions = 10;
 
       for (int r = 0; r < GameConstants.boardSize; r++) {
         for (int c = 0; c < GameConstants.boardSize; c++) {
-          if (_solverBoard[r][c] == 0) {
+          if (boardCopy[r][c] == 0) {
             int options = 0;
             for (int val = 1; val <= 9; val++) {
-              if (SudokuLogic.isValid(_solverBoard, r, c, val)) {
+              if (SudokuLogic.isValid(boardCopy, r, c, val)) {
                 options++;
               }
             }
@@ -1049,14 +1201,35 @@ class SudokuSolverProvider extends ChangeNotifier {
         }
       }
 
+      String? explanation;
+      int solvedVal = 0;
       if (targetRow != -1 && targetCol != -1) {
-        int solvedVal = solvedCopy[targetRow][targetCol];
-        _stepExplanation = SudokuAnalyzer.analyzeCell(
-          _solverBoard,
+        solvedVal = solvedCopy[targetRow][targetCol];
+        explanation = SudokuAnalyzer.analyzeCell(
+          boardCopy,
           targetRow,
           targetCol,
           solvedVal,
         );
+      }
+
+      return {
+        'success': true,
+        'targetRow': targetRow,
+        'targetCol': targetCol,
+        'solvedVal': solvedVal,
+        'explanation': explanation,
+      };
+    });
+
+    if (result['success'] == true) {
+      final targetRow = result['targetRow'] as int;
+      final targetCol = result['targetCol'] as int;
+      final solvedVal = result['solvedVal'] as int;
+      final explanation = result['explanation'] as String?;
+
+      if (targetRow != -1 && targetCol != -1) {
+        _stepExplanation = explanation;
         _solverBoard[targetRow][targetCol] = solvedVal;
         _selectedRow = targetRow;
         _selectedCol = targetCol;

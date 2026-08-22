@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'difficulty.dart';
 import 'sudoku_logic.dart';
+
 
 
 /// Detailed result of a cell strategy hint analysis including visual annotations.
@@ -35,24 +37,57 @@ class SudokuAnalyzer {
     // Target cell highlight
     highlights['$row,$col'] = theme.colorScheme.primaryContainer;
 
-    // Highlight row/col/box related cells based on technique type
-    if (explanation.contains('Row')) {
+    // Check technique context structurally without relying on fragile string matching
+    bool isUniqueInRow = true;
+    for (int c = 0; c < 9; c++) {
+      if (c != col && currentBoard[row][c] == 0) {
+        if (isValidForAnalysis(currentBoard, row, c, correctVal)) {
+          isUniqueInRow = false;
+          break;
+        }
+      }
+    }
+
+    bool isUniqueInCol = true;
+    for (int r = 0; r < 9; r++) {
+      if (r != row && currentBoard[r][col] == 0) {
+        if (isValidForAnalysis(currentBoard, r, col, correctVal)) {
+          isUniqueInCol = false;
+          break;
+        }
+      }
+    }
+
+    int boxRowStart = row - row % 3;
+    int boxColStart = col - col % 3;
+    bool isUniqueInBox = true;
+    for (int r = boxRowStart; r < boxRowStart + 3; r++) {
+      for (int c = boxColStart; c < boxColStart + 3; c++) {
+        if ((r != row || c != col) && currentBoard[r][c] == 0) {
+          if (isValidForAnalysis(currentBoard, r, c, correctVal)) {
+            isUniqueInBox = false;
+            break;
+          }
+        }
+      }
+    }
+
+    // Highlight row/col/box related cells based on technique structure
+    if (isUniqueInRow) {
       for (int c = 0; c < 9; c++) {
         if (c != col && currentBoard[row][c] == 0) {
           highlights['$row,$c'] = theme.colorScheme.secondaryContainer.withValues(alpha: 0.4);
         }
       }
-    } else if (explanation.contains('Column')) {
+    } else if (isUniqueInCol) {
       for (int r = 0; r < 9; r++) {
         if (r != row && currentBoard[r][col] == 0) {
           highlights['$r,$col'] = theme.colorScheme.secondaryContainer.withValues(alpha: 0.4);
         }
       }
-    } else if (explanation.contains('3x3 Box') || explanation.contains('Block')) {
-      int boxR = row - row % 3;
-      int boxC = col - col % 3;
-      for (int r = boxR; r < boxR + 3; r++) {
-        for (int c = boxC; c < boxC + 3; c++) {
+    } else if (isUniqueInBox) {
+      for (int r = boxRowStart; r < boxRowStart + 3; r++) {
+        for (int c = boxColStart; c < boxColStart + 3; c++) {
           if ((r != row || c != col) && currentBoard[r][c] == 0) {
             highlights['$r,$c'] = theme.colorScheme.secondaryContainer.withValues(alpha: 0.4);
           }
@@ -833,6 +868,98 @@ class SudokuAnalyzer {
     }
     return true;
   }
+
+  /// Solves a custom puzzle and produces a complete step-by-step logical breakdown.
+  static CustomPuzzleSolveResult solveWithStepBreakdown(List<List<int>> board) {
+    final current = SudokuLogic.copyBoard(board);
+    final solved = SudokuLogic.copyBoard(board);
+    final isValid = SudokuLogic.isBoardValid(board);
+    if (!isValid) {
+      return CustomPuzzleSolveResult(
+        solvedBoard: board,
+        isValid: false,
+        isUnique: false,
+        steps: [],
+      );
+    }
+
+    final isUnique = SudokuLogic.hasUniqueSolution(board);
+    SudokuLogic.solve(solved);
+
+    final steps = <SolutionStep>[];
+    bool progress = true;
+
+    while (progress) {
+      progress = false;
+      for (int r = 0; r < 9; r++) {
+        for (int c = 0; c < 9; c++) {
+          if (current[r][c] == 0) {
+            final correctVal = solved[r][c];
+            if (correctVal != 0) {
+              final explanation = analyzeCell(current, r, c, correctVal);
+              final lines = explanation.split('\n');
+              final strategyName = lines.isNotEmpty ? lines[0] : 'Logical Step';
+
+              current[r][c] = correctVal;
+              steps.add(
+                SolutionStep(
+                  row: r,
+                  col: c,
+                  value: correctVal,
+                  strategyName: strategyName,
+                  explanation: explanation,
+                ),
+              );
+              progress = true;
+              break;
+            }
+          }
+        }
+        if (progress) break;
+      }
+    }
+
+    return CustomPuzzleSolveResult(
+      solvedBoard: solved,
+      isValid: true,
+      isUnique: isUnique,
+      steps: steps,
+    );
+  }
+
+  /// Generates a puzzle tailored to a specific strategy and difficulty level.
+  static SudokuPuzzle generateTargetedPuzzle(
+    String strategyName,
+    Difficulty difficulty, {
+    int? seed,
+  }) {
+    for (int attempt = 0; attempt < 10; attempt++) {
+      final puzzle = SudokuLogic.generatePuzzle(
+        difficulty,
+        seed: seed != null ? seed + attempt : null,
+      );
+      final current = SudokuLogic.copyBoard(puzzle.puzzleBoard);
+      for (int r = 0; r < 9; r++) {
+        for (int c = 0; c < 9; c++) {
+          if (current[r][c] == 0) {
+            final explanation = analyzeCell(
+              current,
+              r,
+              c,
+              puzzle.solvedBoard[r][c],
+            );
+            if (explanation
+                .toLowerCase()
+                .contains(strategyName.toLowerCase())) {
+              return puzzle;
+            }
+          }
+        }
+      }
+    }
+    // Return standard puzzle if attempt limit reached
+    return SudokuLogic.generatePuzzle(difficulty, seed: seed);
+  }
 }
 
 /// Diagnostic result for mistake analysis.
@@ -847,4 +974,37 @@ class MistakeDiagnosticResult {
     required this.conflictCell,
   });
 }
+
+/// Result of custom puzzle step-by-step solving analysis.
+class CustomPuzzleSolveResult {
+  final List<List<int>> solvedBoard;
+  final bool isValid;
+  final bool isUnique;
+  final List<SolutionStep> steps;
+
+  CustomPuzzleSolveResult({
+    required this.solvedBoard,
+    required this.isValid,
+    required this.isUnique,
+    required this.steps,
+  });
+}
+
+/// Individual logical solution step.
+class SolutionStep {
+  final int row;
+  final int col;
+  final int value;
+  final String strategyName;
+  final String explanation;
+
+  SolutionStep({
+    required this.row,
+    required this.col,
+    required this.value,
+    required this.strategyName,
+    required this.explanation,
+  });
+}
+
 

@@ -1,5 +1,14 @@
 /// Formatted printable worksheet generator for Sudoku puzzles.
 class PdfExporter {
+  static String _escapeHtml(String text) {
+    return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+  }
+
   /// Generates a styled HTML/SVG printable document containing the 9x9 grid, title, and answer key.
   static String generatePrintableHtml({
     required List<List<int>> board,
@@ -7,13 +16,15 @@ class PdfExporter {
     required String title,
     required String difficulty,
   }) {
+    final safeTitle = _escapeHtml(title);
+    final safeDifficulty = _escapeHtml(difficulty);
     final buffer = StringBuffer();
 
     buffer.writeln('<!DOCTYPE html>');
     buffer.writeln('<html>');
     buffer.writeln('<head>');
     buffer.writeln('<meta charset="utf-8">');
-    buffer.writeln('<title>$title - DartSudoku Printable Worksheet</title>');
+    buffer.writeln('<title>$safeTitle - DartSudoku Printable Worksheet</title>');
     buffer.writeln('<style>');
     buffer.writeln('body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; text-align: center; color: #1a1a1a; padding: 20px; }');
     buffer.writeln('h1 { margin-bottom: 4px; font-size: 28px; }');
@@ -32,7 +43,7 @@ class PdfExporter {
     buffer.writeln('<body>');
     buffer.writeln('<button onclick="window.print()" style="padding:10px 24px; font-size:16px; font-weight:bold; background:#4f46e5; color:#fff; border:none; border-radius:8px; cursor:pointer; margin-bottom:20px;">PRINT WORKSHEET</button>');
     buffer.writeln('<h1>🌌 DartSudoku</h1>');
-    buffer.writeln('<div class="subtitle">$title • $difficulty</div>');
+    buffer.writeln('<div class="subtitle">$safeTitle • $safeDifficulty</div>');
 
     // Puzzle Grid
     buffer.writeln('<div class="grid-container">');

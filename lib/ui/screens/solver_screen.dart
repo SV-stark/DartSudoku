@@ -5,7 +5,9 @@ import '../../core/sudoku_ocr_scanner.dart';
 import '../../core/services/audio_service.dart';
 import '../components/numpad.dart';
 import '../components/sudoku_grid.dart';
+import '../components/custom_answers_dialog.dart';
 import '../theme.dart';
+
 
 /// The screen where users can enter custom Sudoku grids to get complete or cell-level solutions.
 class SolverScreen extends StatefulWidget {
@@ -720,9 +722,25 @@ class _SolverScreenState extends State<SolverScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              CustomAnswersDialog.show(context, _provider.solverBoard);
+            },
+            icon: const Icon(Icons.menu_book_rounded),
+            label: const Text(
+              'INSPECT FULL ANSWERS & BREAKDOWN',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+          ),
+        ),
       ],
     );
   }
+
 
   Widget _buildStepExplanationDisplay() {
     final theme = Theme.of(context);

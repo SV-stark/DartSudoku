@@ -3,6 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dart_sudoku/providers/sudoku_provider.dart';
 import 'package:dart_sudoku/providers/settings_provider.dart';
 import 'package:dart_sudoku/core/difficulty.dart';
+import 'package:dart_sudoku/core/sudoku_logic.dart';
+import 'package:dart_sudoku/core/daily_challenge_manager.dart';
+import 'package:dart_sudoku/core/achievements_manager.dart';
 import 'package:dart_sudoku/core/stats_manager.dart';
 
 void main() {
@@ -210,5 +213,158 @@ void main() {
         }
       },
     );
+
+    test('initialBoard remains unchanged when player makes moves', () async {
+      final provider = SudokuGameProvider();
+      await provider.newGame(Difficulty.easy);
+
+      final clonedInitial = List.generate(
+        9,
+        (r) => List<int>.from(provider.initialBoard[r]),
+      );
+
+      // Find an empty cell and enter a number
+      int emptyRow = -1;
+      int emptyCol = -1;
+      for (int r = 0; r < 9; r++) {
+        for (int c = 0; c < 9; c++) {
+          if (!provider.isOriginalClue[r][c]) {
+            emptyRow = r;
+            emptyCol = c;
+            break;
+          }
+        }
+        if (emptyRow != -1) break;
+      }
+
+      provider.selectCell(emptyRow, emptyCol);
+      final val = provider.solvedBoard[emptyRow][emptyCol];
+      await provider.enterNumber(val);
+
+      // currentBoard has mutated, but initialBoard must NOT have mutated
+      expect(provider.currentBoard[emptyRow][emptyCol], val);
+      expect(provider.initialBoard[emptyRow][emptyCol], clonedInitial[emptyRow][emptyCol]);
+      expect(provider.initialBoard[emptyRow][emptyCol], 0);
+    });
+
+    test('undo restores mistakes count when retracting a mistake', () async {
+      final provider = SudokuGameProvider();
+      await provider.newGame(Difficulty.easy);
+
+      int emptyRow = -1;
+      int emptyCol = -1;
+      for (int r = 0; r < 9; r++) {
+        for (int c = 0; c < 9; c++) {
+          if (!provider.isOriginalClue[r][c]) {
+            emptyRow = r;
+            emptyCol = c;
+            break;
+          }
+        }
+        if (emptyRow != -1) break;
+      }
+
+      provider.selectCell(emptyRow, emptyCol);
+      final correctVal = provider.solvedBoard[emptyRow][emptyCol];
+      final wrongVal = (correctVal % 9) + 1;
+
+      expect(provider.mistakes, 0);
+      await provider.enterNumber(wrongVal);
+      expect(provider.mistakes, 1);
+
+      await provider.undo();
+      expect(provider.mistakes, 0);
+      expect(provider.currentBoard[emptyRow][emptyCol], 0);
+    });
+
+    test('entering identical digit does not record ghost MoveRecord', () async {
+      final provider = SudokuGameProvider();
+      await provider.newGame(Difficulty.easy);
+
+      int emptyRow = -1;
+      int emptyCol = -1;
+      for (int r = 0; r < 9; r++) {
+        for (int c = 0; c < 9; c++) {
+          if (!provider.isOriginalClue[r][c]) {
+            emptyRow = r;
+            emptyCol = c;
+            break;
+          }
+        }
+        if (emptyRow != -1) break;
+      }
+
+      provider.selectCell(emptyRow, emptyCol);
+      final correctVal = provider.solvedBoard[emptyRow][emptyCol];
+
+      await provider.enterNumber(correctVal);
+      expect(provider.moveHistory.length, 1);
+
+      // Entering same number on same cell again should early return without adding MoveRecord
+      await provider.enterNumber(correctVal);
+      expect(provider.moveHistory.length, 1);
+    });
+
+    test('variants and killer cages are preserved across save and load', () async {
+      final provider = SudokuGameProvider();
+      await provider.newGame(
+        Difficulty.medium,
+        variant: SudokuVariant.killer,
+      );
+
+      expect(provider.activeVariant, SudokuVariant.killer);
+      expect(provider.killerCages, isNotNull);
+      expect(provider.killerCages!.isNotEmpty, true);
+
+      final cageCount = provider.killerCages!.length;
+      await provider.pauseGame(); // Trigger save game state
+
+      final newProvider = SudokuGameProvider();
+      await newProvider.loadSavedGame();
+
+      expect(newProvider.activeVariant, SudokuVariant.killer);
+      expect(newProvider.killerCages, isNotNull);
+      expect(newProvider.killerCages!.length, cageCount);
+    });
+
+    test('DailyChallengeManager streak calculation and streak_7 unlock', () async {
+      final baseDate = DateTime(2026, 7, 1);
+
+      for (int i = 0; i < 7; i++) {
+        await DailyChallengeManager.markDateCompleted(
+          baseDate.add(Duration(days: i)),
+        );
+      }
+
+      final bestStreak = await DailyChallengeManager.getBestStreak();
+      expect(bestStreak, greaterThanOrEqualTo(7));
+
+      final achievements = await AchievementsManager.getAchievements();
+      final streak7 = achievements.firstWhere((a) => a.id == 'streak_7');
+      expect(streak7.isUnlocked, true);
+    });
+
+    test('SettingsProvider sound and haptics persistence', () async {
+      final settings = SettingsProvider.instance;
+      await settings.updateSettings(
+        soundEnabled: false,
+        hapticsEnabled: false,
+      );
+
+      expect(settings.soundEnabled, false);
+      expect(settings.hapticsEnabled, false);
+
+      await settings.loadSettings();
+      expect(settings.soundEnabled, false);
+      expect(settings.hapticsEnabled, false);
+
+      // Reset to defaults
+      await settings.updateSettings(
+        soundEnabled: true,
+        hapticsEnabled: true,
+      );
+      expect(settings.soundEnabled, true);
+      expect(settings.hapticsEnabled, true);
+    });
   });
 }

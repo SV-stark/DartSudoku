@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../data/prefs_keys.dart';
+import '../../core/daily_challenge_manager.dart';
 import '../../core/difficulty.dart';
 import '../theme.dart';
 import 'game_screen.dart';
@@ -30,9 +29,8 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
       _isLoading = true;
     });
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _completedDates =
-          prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
+      final completed = await DailyChallengeManager.getCompletedDates();
+      _completedDates = completed.toList();
     } catch (e, stack) {
       debugPrint(
         'Error loading completions in DailyChallengeScreen: $e\n$stack',

@@ -140,6 +140,32 @@ class SettingsSheet extends StatelessWidget {
                   onChanged: (val) =>
                       provider.updateSettings(autoRemoveNotes: val),
                 ),
+                const SizedBox(height: 16),
+
+                // Switch 6: Sound Effects
+                _buildSettingTile(
+                  context,
+                  icon: Icons.volume_up_rounded,
+                  title: 'Sound Effects',
+                  description:
+                      'Play auditory feedback cues when entering numbers and completing puzzles.',
+                  value: provider.soundEnabled,
+                  onChanged: (val) =>
+                      provider.updateSettings(soundEnabled: val),
+                ),
+                const SizedBox(height: 16),
+
+                // Switch 7: Haptic Feedback
+                _buildSettingTile(
+                  context,
+                  icon: Icons.vibration_rounded,
+                  title: 'Haptic Feedback',
+                  description:
+                      'Vibrate subtly on keypresses and game actions.',
+                  value: provider.hapticsEnabled,
+                  onChanged: (val) =>
+                      provider.updateSettings(hapticsEnabled: val),
+                ),
                 const SizedBox(height: 24),
               ],
             ),

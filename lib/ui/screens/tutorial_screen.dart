@@ -7,6 +7,7 @@ import '../components/sudoku_grid.dart';
 import '../../core/sudoku_lessons_data.dart';
 import '../../core/sudoku_logic.dart';
 import '../../core/services/audio_service.dart';
+import '../../core/achievements_manager.dart';
 
 /// Interactive tutorial screen providing slides, explainers, and highlighted grids for strategies.
 class TutorialScreen extends StatefulWidget {
@@ -2249,6 +2250,17 @@ class _TutorialScreenState extends State<TutorialScreen>
       'completed_lessons',
       _completedLessons.map((e) => e.toString()).toList(),
     );
+
+    bool allTier1Completed = true;
+    for (int i = 0; i <= 11; i++) {
+      if (!_completedLessons.contains(i)) {
+        allTier1Completed = false;
+        break;
+      }
+    }
+    if (allTier1Completed) {
+      AchievementsManager.unlock('school_grad');
+    }
   }
 
   Future<void> _solvePractice(int lessonIndex) async {

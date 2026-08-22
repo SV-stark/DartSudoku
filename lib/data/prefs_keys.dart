@@ -15,10 +15,15 @@ class PrefsKeys {
   static const String highlightIdentical = 'highlight_identical';
   static const String endlessMode = 'endless_mode';
   static const String autoRemoveNotes = 'auto_remove_notes';
+  static const String soundEnabled = 'sound_enabled';
+  static const String hapticsEnabled = 'haptics_enabled';
 
   // Save Game Keys
   static const String savedDifficulty = 'saved_difficulty';
   static const String savedDailyDate = 'saved_daily_date';
+  static const String savedVariant = 'saved_variant';
+  static const String savedCages = 'saved_cages';
+  static const String savedInitialBoard = 'saved_initial_board';
   static const String savedCurrentBoard = 'saved_current_board';
   static const String savedSolvedBoard = 'saved_solved_board';
   static const String savedIsOriginalClue = 'saved_is_original_clue';
