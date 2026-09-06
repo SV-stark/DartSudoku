@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/constants.dart';
@@ -38,6 +39,7 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
   final List<ConfettiParticle> _particles = [];
   final Random _random = Random();
   Size? _screenSize;
+  Timer? _stopTimer;
 
   @override
   void initState() {
@@ -47,11 +49,10 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
       duration: const Duration(seconds: 4),
     )..addListener(_updateParticles);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _screenSize = MediaQuery.of(context).size;
-        _spawnParticles();
-        _controller.repeat();
+    // Automatically pause ticker after 15 seconds to conserve battery/CPU
+    _stopTimer = Timer(const Duration(seconds: 15), () {
+      if (mounted && _controller.isAnimating) {
+        _controller.stop();
       }
     });
   }
@@ -68,6 +69,7 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
       Colors.cyan,
       Colors.orange,
     ];
+    _particles.clear();
     for (int i = 0; i < GameConstants.confettiParticleCount; i++) {
       _particles.add(
         ConfettiParticle(
@@ -102,17 +104,30 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
 
   @override
   void dispose() {
+    _stopTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: CustomPaint(
-        painter: ConfettiPainter(_particles, repaint: _controller),
-        size: Size.infinite,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final newSize = Size(constraints.maxWidth, constraints.maxHeight);
+        if (_screenSize != newSize && newSize.width > 0 && newSize.height > 0) {
+          _screenSize = newSize;
+          if (_particles.isEmpty) {
+            _spawnParticles();
+            _controller.repeat();
+          }
+        }
+        return IgnorePointer(
+          child: CustomPaint(
+            painter: ConfettiPainter(_particles, repaint: _controller),
+            size: Size.infinite,
+          ),
+        );
+      },
     );
   }
 }

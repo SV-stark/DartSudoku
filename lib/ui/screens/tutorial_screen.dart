@@ -103,7 +103,7 @@ class _TutorialScreenState extends State<TutorialScreen>
       _initSlide();
     }
     if (_practiceBoard == null) {
-      _generatePracticeChallenge(_practiceLessonIndex);
+      _generatePracticeChallenge(_practiceLessonIndex, notify: false);
     }
   }
 
@@ -168,7 +168,7 @@ class _TutorialScreenState extends State<TutorialScreen>
     }
   }
 
-  void _generatePracticeChallenge(int lessonIndex) {
+  void _generatePracticeChallenge(int lessonIndex, {bool notify = true}) {
     final lessons = SudokuLessonsData.getLessons(context);
     final lesson = lessons[lessonIndex];
 
@@ -179,14 +179,13 @@ class _TutorialScreenState extends State<TutorialScreen>
         break;
       }
     }
-    practiceSlide ??= lesson.slides.last;
+    if (practiceSlide == null) return;
 
-    // Generate a random 1-to-1 digit permutation map for 1-9
-    final digits = List.generate(9, (i) => i + 1);
-    digits.shuffle();
+    // Build digit permutation map (1-9 shuffled) to make each practice run fresh
+    final List<int> digits = [1, 2, 3, 4, 5, 6, 7, 8, 9]..shuffle();
     final Map<int, int> perm = {};
-    for (int i = 0; i < 9; i++) {
-      perm[i + 1] = digits[i];
+    for (int i = 1; i <= 9; i++) {
+      perm[i] = digits[i - 1];
     }
 
     final int? origExpected = practiceSlide.expectedValue;
@@ -225,7 +224,7 @@ class _TutorialScreenState extends State<TutorialScreen>
     final Set<String> untouchable = {targetKey, ...patternCells};
 
     // 4. Build the permuted board with clues and background solved cells
-    final Random random = Random();
+    final Random random = Random(42 + lessonIndex);
     final permutedBoard = List.generate(9, (r) {
       return List.generate(9, (c) {
         final key = '$r,$c';
@@ -302,7 +301,7 @@ class _TutorialScreenState extends State<TutorialScreen>
       initialStage = 2;
     }
 
-    setState(() {
+    void applyState() {
       _practiceLessonIndex = lessonIndex;
       _practiceBoard = permutedBoard;
       _practiceExpectedValue = permutedExpected;
@@ -328,7 +327,13 @@ class _TutorialScreenState extends State<TutorialScreen>
       _practiceIncorrectCandidates = incorrectCandidates;
 
       _updatePracticeText();
-    });
+    }
+
+    if (notify) {
+      setState(applyState);
+    } else {
+      applyState();
+    }
   }
 
   String _getPracticeHint(int lessonIndex, int expectedVal) {
@@ -2259,7 +2264,7 @@ class _TutorialScreenState extends State<TutorialScreen>
       }
     }
     if (allTier1Completed) {
-      AchievementsManager.unlock('school_grad');
+      await AchievementsManager.unlock('school_grad');
     }
   }
 
@@ -2396,7 +2401,7 @@ class _TutorialScreenState extends State<TutorialScreen>
     }
 
     if (mounted) {
-      showDialog(
+      await showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) {

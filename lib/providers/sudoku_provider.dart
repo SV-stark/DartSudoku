@@ -25,6 +25,8 @@ class BoardState {
   });
 }
 
+enum MoveActionType { enterNumber, toggleNote, erase, undo, redo, hint }
+
 /// Record of an individual move for replay and hesitation heatmap calculation.
 class MoveRecord {
   final int timestampMs;
@@ -33,6 +35,8 @@ class MoveRecord {
   final int value;
   final bool isNote;
   final int durationMs;
+  final BoardState? snapshot;
+  final MoveActionType actionType;
 
   MoveRecord({
     required this.timestampMs,
@@ -41,11 +45,12 @@ class MoveRecord {
     required this.value,
     required this.isNote,
     required this.durationMs,
+    this.snapshot,
+    this.actionType = MoveActionType.enterNumber,
   });
 }
 
-
-enum GameStatus { idle, loading, playing, paused, won, gameOver }
+enum GameStatus { idle, loading, playing, paused, won, gameOver, error }
 
 /// Manages the state of the active play game.
 class SudokuGameProvider extends ChangeNotifier {
@@ -88,6 +93,7 @@ class SudokuGameProvider extends ChangeNotifier {
   Difficulty _difficulty = Difficulty.easy;
   String? _dailyChallengeDate;
   GameStatus _status = GameStatus.idle;
+  String? _errorMessage;
 
   bool _notesMode = false;
   int _elapsedSeconds = 0;
@@ -144,6 +150,7 @@ class SudokuGameProvider extends ChangeNotifier {
   int get maxMistakes => GameConstants.maxMistakes;
   Difficulty get difficulty => _difficulty;
   GameStatus get status => _status;
+  String? get errorMessage => _errorMessage;
   bool get notesMode => _notesMode;
   int get elapsedSeconds => _elapsedSeconds;
   bool get canUndo => _undoHistory.isNotEmpty;
@@ -277,27 +284,96 @@ class SudokuGameProvider extends ChangeNotifier {
     selectionNotifier.notifyListeners();
   }
 
+  BoardState _createCurrentBoardSnapshot() {
+    return BoardState(
+      board: SudokuLogic.copyBoard(_currentBoard),
+      notes: List.generate(
+        GameConstants.boardSize,
+        (r) => List.generate(
+          GameConstants.boardSize,
+          (c) => Set<int>.from(_notes[r][c]),
+        ),
+      ),
+      mistakes: _mistakes,
+    );
+  }
+
   /// Start a new game with [difficulty], optionally seeded for a [dailyDate] challenge and [variant]
   Future<void> newGame(
     Difficulty difficulty, {
     String? dailyDate,
     SudokuVariant variant = SudokuVariant.standard,
+    int? seed,
   }) async {
+    _errorMessage = null;
     _status = GameStatus.loading;
     notifyListeners();
 
-    int? seed;
-    if (dailyDate != null) {
+    int? effectiveSeed = seed;
+    if (dailyDate != null && effectiveSeed == null) {
       // Create a deterministic seed from the date string, e.g. "2026-06-05" -> 20260605
       final cleanDate = dailyDate.replaceAll('-', '');
-      seed = int.tryParse(cleanDate) ?? dailyDate.hashCode;
+      effectiveSeed = int.tryParse(cleanDate) ?? dailyDate.hashCode;
     }
 
-    // Generate puzzle asynchronously in a background isolate to keep UI responsive
-    final puzzle = await Isolate.run(
-      () => SudokuLogic.generatePuzzle(difficulty, seed: seed, variant: variant),
-    );
+    const int maxGenerationRetries = 3;
+    SudokuPuzzle? puzzle;
+    for (int attempt = 0; attempt < maxGenerationRetries; attempt++) {
+      try {
+        final currentSeed = effectiveSeed != null ? effectiveSeed + attempt : null;
+        puzzle = await Isolate.run(
+          () => SudokuLogic.generatePuzzle(difficulty, seed: currentSeed, variant: variant),
+        ).timeout(const Duration(seconds: 15));
+        break;
+      } catch (e) {
+        if (attempt == maxGenerationRetries - 1) {
+          _status = GameStatus.error;
+          _errorMessage = 'Failed to generate puzzle. Please try again.';
+          notifyListeners();
+          return;
+        }
+      }
+    }
 
+    if (puzzle == null) {
+      _status = GameStatus.error;
+      _errorMessage = 'Failed to generate puzzle. Please try again.';
+      notifyListeners();
+      return;
+    }
+
+    _applyPuzzle(puzzle, difficulty, dailyDate: dailyDate, variant: variant);
+    await _clearSavedGame();
+
+    // Only record standard starts if not in daily challenge mode
+    if (dailyDate == null) {
+      await StatsManager.recordGameStart(difficulty);
+    }
+    notifyListeners();
+  }
+
+  /// Load a pre-generated or targeted puzzle directly into the provider
+  Future<void> loadPuzzle(
+    SudokuPuzzle puzzle,
+    Difficulty difficulty, {
+    SudokuVariant variant = SudokuVariant.standard,
+  }) async {
+    _errorMessage = null;
+    _status = GameStatus.loading;
+    notifyListeners();
+
+    _applyPuzzle(puzzle, difficulty, variant: variant);
+    await _clearSavedGame();
+    await StatsManager.recordGameStart(difficulty);
+    notifyListeners();
+  }
+
+  void _applyPuzzle(
+    SudokuPuzzle puzzle,
+    Difficulty difficulty, {
+    String? dailyDate,
+    SudokuVariant variant = SudokuVariant.standard,
+  }) {
     _difficulty = difficulty;
     _dailyChallengeDate = dailyDate;
     _activeVariant = variant;
@@ -335,15 +411,6 @@ class SudokuGameProvider extends ChangeNotifier {
 
     _status = GameStatus.playing;
     _startTimer();
-
-    // Clear any previously saved active game since we started a new one
-    await _clearSavedGame();
-
-    // Only record standard starts if not in daily challenge mode
-    if (dailyDate == null) {
-      StatsManager.recordGameStart(difficulty);
-    }
-    notifyListeners();
   }
 
   void toggleNotesMode() {
@@ -423,6 +490,22 @@ class SudokuGameProvider extends ChangeNotifier {
     _notes = prevState.notes;
     _mistakes = prevState.mistakes;
 
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final durationMs = now - _lastMoveTimeMs;
+    _lastMoveTimeMs = now;
+    _moveHistory.add(
+      MoveRecord(
+        timestampMs: now,
+        row: _selectedRow,
+        col: _selectedCol,
+        value: 0,
+        isNote: false,
+        durationMs: durationMs,
+        snapshot: _createCurrentBoardSnapshot(),
+        actionType: MoveActionType.undo,
+      ),
+    );
+
     _onBoardStateChanged();
     _findAndFlashDifference(oldBoard, _currentBoard);
     notifyListeners();
@@ -453,6 +536,22 @@ class SudokuGameProvider extends ChangeNotifier {
     _notes = nextState.notes;
     _mistakes = nextState.mistakes;
 
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final durationMs = now - _lastMoveTimeMs;
+    _lastMoveTimeMs = now;
+    _moveHistory.add(
+      MoveRecord(
+        timestampMs: now,
+        row: _selectedRow,
+        col: _selectedCol,
+        value: 0,
+        isNote: false,
+        durationMs: durationMs,
+        snapshot: _createCurrentBoardSnapshot(),
+        actionType: MoveActionType.redo,
+      ),
+    );
+
     _onBoardStateChanged();
     _findAndFlashDifference(oldBoard, _currentBoard);
     notifyListeners();
@@ -460,26 +559,17 @@ class SudokuGameProvider extends ChangeNotifier {
   }
 
   /// Input a number from the numpad
-  Future<void> enterNumber(int number) async {
+  Future<void> enterNumber(int number, {bool? asNote}) async {
     if (_status != GameStatus.playing) return;
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
 
-    if (_notesMode) {
+    final effectiveNotesMode = asNote ?? _notesMode;
+
+    if (effectiveNotesMode) {
       final now = DateTime.now().millisecondsSinceEpoch;
       final durationMs = now - _lastMoveTimeMs;
       _lastMoveTimeMs = now;
-
-      _moveHistory.add(
-        MoveRecord(
-          timestampMs: now,
-          row: _selectedRow,
-          col: _selectedCol,
-          value: number,
-          isNote: true,
-          durationMs: durationMs,
-        ),
-      );
 
       // Toggle note
       _saveToHistory();
@@ -490,6 +580,19 @@ class SudokuGameProvider extends ChangeNotifier {
         _currentBoard[_selectedRow][_selectedCol] =
             0; // Clear cell if placing a note
       }
+
+      _moveHistory.add(
+        MoveRecord(
+          timestampMs: now,
+          row: _selectedRow,
+          col: _selectedCol,
+          value: number,
+          isNote: true,
+          durationMs: durationMs,
+          snapshot: _createCurrentBoardSnapshot(),
+          actionType: MoveActionType.toggleNote,
+        ),
+      );
       _onBoardStateChanged();
     } else {
       // Direct number input - check early before recording move
@@ -499,6 +602,10 @@ class SudokuGameProvider extends ChangeNotifier {
       final durationMs = now - _lastMoveTimeMs;
       _lastMoveTimeMs = now;
 
+      _saveToHistory();
+      _currentBoard[_selectedRow][_selectedCol] = number;
+      _notes[_selectedRow][_selectedCol].clear(); // Clear notes for this cell
+
       _moveHistory.add(
         MoveRecord(
           timestampMs: now,
@@ -507,32 +614,33 @@ class SudokuGameProvider extends ChangeNotifier {
           value: number,
           isNote: false,
           durationMs: durationMs,
+          snapshot: _createCurrentBoardSnapshot(),
+          actionType: MoveActionType.enterNumber,
         ),
       );
 
-      _saveToHistory();
-      _currentBoard[_selectedRow][_selectedCol] = number;
-      _notes[_selectedRow][_selectedCol].clear(); // Clear notes for this cell
       _onBoardStateChanged();
 
       // Check if the number is correct compared to solution
       if (number != _solvedBoard[_selectedRow][_selectedCol]) {
-        _lastMistakeDiagnostic = SudokuAnalyzer.analyzeMistake(
-          _currentBoard,
-          _selectedRow,
-          _selectedCol,
-          number,
-          _solvedBoard,
-          variant: _activeVariant,
-        );
         if (showMistakes) {
+          _lastMistakeDiagnostic = SudokuAnalyzer.analyzeMistake(
+            _currentBoard,
+            _selectedRow,
+            _selectedCol,
+            number,
+            _solvedBoard,
+            variant: _activeVariant,
+          );
           _mistakes++;
           if (!endlessMode && _mistakes >= GameConstants.maxMistakes) {
             _status = GameStatus.gameOver;
             _stopTimer();
             await _clearSavedGame();
-            StatsManager.recordGameLoss();
+            await StatsManager.recordGameLoss();
           }
+        } else {
+          _lastMistakeDiagnostic = null;
         }
       } else {
         _lastMistakeDiagnostic = null;
@@ -548,7 +656,7 @@ class SudokuGameProvider extends ChangeNotifier {
         _status = GameStatus.won;
         _stopTimer();
         await _clearSavedGame();
-        StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
+        await StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
       }
     }
     notifyListeners();
@@ -566,9 +674,27 @@ class SudokuGameProvider extends ChangeNotifier {
       return;
     }
 
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final durationMs = now - _lastMoveTimeMs;
+    _lastMoveTimeMs = now;
+
     _saveToHistory();
     _currentBoard[_selectedRow][_selectedCol] = 0;
     _notes[_selectedRow][_selectedCol].clear();
+
+    _moveHistory.add(
+      MoveRecord(
+        timestampMs: now,
+        row: _selectedRow,
+        col: _selectedCol,
+        value: 0,
+        isNote: false,
+        durationMs: durationMs,
+        snapshot: _createCurrentBoardSnapshot(),
+        actionType: MoveActionType.erase,
+      ),
+    );
+
     _onBoardStateChanged();
     notifyListeners();
     await _saveGameState();
@@ -583,10 +709,28 @@ class SudokuGameProvider extends ChangeNotifier {
     int correctVal = _solvedBoard[_selectedRow][_selectedCol];
     if (_currentBoard[_selectedRow][_selectedCol] == correctVal) return;
 
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final durationMs = now - _lastMoveTimeMs;
+    _lastMoveTimeMs = now;
+
     _hintsUsed++;
     _saveToHistory();
     _currentBoard[_selectedRow][_selectedCol] = correctVal;
     _notes[_selectedRow][_selectedCol].clear();
+
+    _moveHistory.add(
+      MoveRecord(
+        timestampMs: now,
+        row: _selectedRow,
+        col: _selectedCol,
+        value: correctVal,
+        isNote: false,
+        durationMs: durationMs,
+        snapshot: _createCurrentBoardSnapshot(),
+        actionType: MoveActionType.hint,
+      ),
+    );
+
     _onBoardStateChanged();
 
     if (autoRemoveNotes) {
@@ -598,7 +742,7 @@ class SudokuGameProvider extends ChangeNotifier {
       _status = GameStatus.won;
       _stopTimer();
       await _clearSavedGame();
-      StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
+      await StatsManager.recordGameWin(_difficulty, _elapsedSeconds);
     }
     notifyListeners();
     await _saveGameState();
@@ -671,6 +815,7 @@ class SudokuGameProvider extends ChangeNotifier {
     _flashTimer?.cancel();
     SettingsProvider.instance.removeListener(_onSettingsChanged);
     _stopTimer();
+    _saveGameState();
     selectionNotifier.dispose();
     timerNotifier.dispose();
     super.dispose();
@@ -1066,19 +1211,24 @@ class SudokuSolverProvider extends ChangeNotifier {
 
     // Create a copy to solve in background isolate
     final boardCopy = SudokuLogic.copyBoard(_solverBoard);
-    final result = await Isolate.run(() {
-      final solvedCopy = SudokuLogic.copyBoard(boardCopy);
-      final success = SudokuLogic.solve(solvedCopy);
-      return {'success': success, 'solved': solvedCopy};
-    });
+    try {
+      final result = await Isolate.run(() {
+        final solvedCopy = SudokuLogic.copyBoard(boardCopy);
+        final success = SudokuLogic.solve(solvedCopy);
+        return {'success': success, 'solved': solvedCopy};
+      }).timeout(const Duration(seconds: 15));
 
-    if (result['success'] == true) {
-      _solverBoard = result['solved'] as List<List<int>>;
-      _status = SolverStatus.solved;
-    } else {
+      if (result['success'] == true) {
+        _solverBoard = result['solved'] as List<List<int>>;
+        _status = SolverStatus.solved;
+      } else {
+        _status = SolverStatus.error;
+        _errorMessage =
+            "This Sudoku layout is unsolvable. Please check your entered values.";
+      }
+    } catch (e) {
       _status = SolverStatus.error;
-      _errorMessage =
-          "This Sudoku layout is unsolvable. Please check your entered values.";
+      _errorMessage = "Solving failed: $e";
     }
     notifyListeners();
   }
@@ -1115,22 +1265,27 @@ class SudokuSolverProvider extends ChangeNotifier {
     final targetCol = _selectedCol;
     final boardCopy = SudokuLogic.copyBoard(_solverBoard);
 
-    final result = await Isolate.run(() {
-      final solvedCopy = SudokuLogic.copyBoard(boardCopy);
-      final success = SudokuLogic.solve(solvedCopy);
-      return {'success': success, 'solved': solvedCopy};
-    });
+    try {
+      final result = await Isolate.run(() {
+        final solvedCopy = SudokuLogic.copyBoard(boardCopy);
+        final success = SudokuLogic.solve(solvedCopy);
+        return {'success': success, 'solved': solvedCopy};
+      }).timeout(const Duration(seconds: 15));
 
-    if (result['success'] == true) {
-      final solvedCopy = result['solved'] as List<List<int>>;
-      final solvedVal = solvedCopy[targetRow][targetCol];
-      _solverBoard[targetRow][targetCol] = solvedVal;
-      _status = SolverStatus.idle;
-      triggerFlash(targetRow, targetCol);
-    } else {
+      if (result['success'] == true) {
+        final solvedCopy = result['solved'] as List<List<int>>;
+        final solvedVal = solvedCopy[targetRow][targetCol];
+        _solverBoard[targetRow][targetCol] = solvedVal;
+        _status = SolverStatus.idle;
+        triggerFlash(targetRow, targetCol);
+      } else {
+        _status = SolverStatus.error;
+        _errorMessage =
+            "This Sudoku layout is unsolvable. Cannot solve the selected cell.";
+      }
+    } catch (e) {
       _status = SolverStatus.error;
-      _errorMessage =
-          "This Sudoku layout is unsolvable. Cannot solve the selected cell.";
+      _errorMessage = "Solving failed: $e";
     }
     notifyListeners();
   }
@@ -1172,77 +1327,82 @@ class SudokuSolverProvider extends ChangeNotifier {
     notifyListeners();
 
     final boardCopy = SudokuLogic.copyBoard(_solverBoard);
-    final result = await Isolate.run(() {
-      final solvedCopy = SudokuLogic.copyBoard(boardCopy);
-      final success = SudokuLogic.solve(solvedCopy);
-      if (!success) {
-        return {'success': false};
-      }
+    try {
+      final result = await Isolate.run(() {
+        final solvedCopy = SudokuLogic.copyBoard(boardCopy);
+        final success = SudokuLogic.solve(solvedCopy);
+        if (!success) {
+          return {'success': false};
+        }
 
-      int targetRow = -1;
-      int targetCol = -1;
-      int minOptions = 10;
+        int targetRow = -1;
+        int targetCol = -1;
+        int minOptions = 10;
 
-      for (int r = 0; r < GameConstants.boardSize; r++) {
-        for (int c = 0; c < GameConstants.boardSize; c++) {
-          if (boardCopy[r][c] == 0) {
-            int options = 0;
-            for (int val = 1; val <= 9; val++) {
-              if (SudokuLogic.isValid(boardCopy, r, c, val)) {
-                options++;
+        for (int r = 0; r < GameConstants.boardSize; r++) {
+          for (int c = 0; c < GameConstants.boardSize; c++) {
+            if (boardCopy[r][c] == 0) {
+              int options = 0;
+              for (int val = 1; val <= 9; val++) {
+                if (SudokuLogic.isValid(boardCopy, r, c, val)) {
+                  options++;
+                }
               }
-            }
-            if (options < minOptions) {
-              minOptions = options;
-              targetRow = r;
-              targetCol = c;
+              if (options < minOptions) {
+                minOptions = options;
+                targetRow = r;
+                targetCol = c;
+              }
             }
           }
         }
-      }
 
-      String? explanation;
-      int solvedVal = 0;
-      if (targetRow != -1 && targetCol != -1) {
-        solvedVal = solvedCopy[targetRow][targetCol];
-        explanation = SudokuAnalyzer.analyzeCell(
-          boardCopy,
-          targetRow,
-          targetCol,
-          solvedVal,
-        );
-      }
+        String? explanation;
+        int solvedVal = 0;
+        if (targetRow != -1 && targetCol != -1) {
+          solvedVal = solvedCopy[targetRow][targetCol];
+          explanation = SudokuAnalyzer.analyzeCell(
+            boardCopy,
+            targetRow,
+            targetCol,
+            solvedVal,
+          );
+        }
 
-      return {
-        'success': true,
-        'targetRow': targetRow,
-        'targetCol': targetCol,
-        'solvedVal': solvedVal,
-        'explanation': explanation,
-      };
-    });
+        return {
+          'success': true,
+          'targetRow': targetRow,
+          'targetCol': targetCol,
+          'solvedVal': solvedVal,
+          'explanation': explanation,
+        };
+      }).timeout(const Duration(seconds: 15));
 
-    if (result['success'] == true) {
-      final targetRow = result['targetRow'] as int;
-      final targetCol = result['targetCol'] as int;
-      final solvedVal = result['solvedVal'] as int;
-      final explanation = result['explanation'] as String?;
+      if (result['success'] == true) {
+        final targetRow = result['targetRow'] as int;
+        final targetCol = result['targetCol'] as int;
+        final solvedVal = result['solvedVal'] as int;
+        final explanation = result['explanation'] as String?;
 
-      if (targetRow != -1 && targetCol != -1) {
-        _stepExplanation = explanation;
-        _solverBoard[targetRow][targetCol] = solvedVal;
-        _selectedRow = targetRow;
-        _selectedCol = targetCol;
-        _status = SolverStatus.idle;
-        triggerFlash(targetRow, targetCol);
+        if (targetRow != -1 && targetCol != -1) {
+          _stepExplanation = explanation;
+          _solverBoard[targetRow][targetCol] = solvedVal;
+          _selectedRow = targetRow;
+          _selectedCol = targetCol;
+          _status = SolverStatus.idle;
+          triggerFlash(targetRow, targetCol);
+        } else {
+          _status = SolverStatus.error;
+          _errorMessage = "Could not find a cell to solve.";
+        }
       } else {
         _status = SolverStatus.error;
-        _errorMessage = "Could not find a cell to solve.";
+        _errorMessage =
+            "This Sudoku layout is unsolvable. Please check your entered values.";
       }
-    } else {
+    } catch (e) {
       _status = SolverStatus.error;
-      _errorMessage =
-          "This Sudoku layout is unsolvable. Please check your entered values.";
+      _errorMessage = "Step-wise solve failed: $e";
     }
     notifyListeners();
   }

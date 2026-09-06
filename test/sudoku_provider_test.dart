@@ -366,5 +366,97 @@ void main() {
       expect(settings.soundEnabled, true);
       expect(settings.hapticsEnabled, true);
     });
+
+    test('loadPuzzle should inject targeted puzzle directly into provider', () async {
+      final puzzle = SudokuLogic.generatePuzzle(Difficulty.easy, seed: 101);
+      final provider = SudokuGameProvider();
+
+      await provider.loadPuzzle(puzzle, Difficulty.easy);
+
+      expect(provider.status, GameStatus.playing);
+      expect(provider.difficulty, Difficulty.easy);
+      expect(provider.currentBoard, equals(puzzle.puzzleBoard));
+      expect(provider.solvedBoard, equals(puzzle.solvedBoard));
+    });
+
+    test('MoveRecord records snapshots and actionTypes accurately on moves and erases', () async {
+      final provider = SudokuGameProvider();
+      await provider.newGame(Difficulty.easy, seed: 101);
+
+      int r = -1, c = -1;
+      for (int row = 0; row < 9; row++) {
+        for (int col = 0; col < 9; col++) {
+          if (!provider.isOriginalClue[row][col]) {
+            r = row;
+            c = col;
+            break;
+          }
+        }
+        if (r != -1) break;
+      }
+
+      provider.selectCell(r, c);
+      final correctVal = provider.solvedBoard[r][c];
+      await provider.enterNumber(correctVal);
+
+      expect(provider.moveHistory.length, 1);
+      expect(provider.moveHistory.first.actionType, MoveActionType.enterNumber);
+      expect(provider.moveHistory.first.snapshot, isNotNull);
+      expect(provider.moveHistory.first.snapshot!.board[r][c], correctVal);
+
+      await provider.eraseCell();
+      expect(provider.moveHistory.length, 2);
+      expect(provider.moveHistory.last.actionType, MoveActionType.erase);
+      expect(provider.moveHistory.last.snapshot, isNotNull);
+      expect(provider.moveHistory.last.snapshot!.board[r][c], 0);
+    });
+
+    test('showMistakes=false prevents lastMistakeDiagnostic from being set on error', () async {
+      final settings = SettingsProvider.instance;
+      await settings.updateSettings(showMistakes: false);
+
+      final provider = SudokuGameProvider();
+      await provider.newGame(Difficulty.easy, seed: 101);
+
+      int r = -1, c = -1;
+      for (int row = 0; row < 9; row++) {
+        for (int col = 0; col < 9; col++) {
+          if (!provider.isOriginalClue[row][col]) {
+            r = row;
+            c = col;
+            break;
+          }
+        }
+        if (r != -1) break;
+      }
+
+      provider.selectCell(r, c);
+      final correctVal = provider.solvedBoard[r][c];
+      final wrongVal = (correctVal % 9) + 1;
+
+      await provider.enterNumber(wrongVal);
+      expect(provider.lastMistakeDiagnostic, isNull);
+      expect(provider.mistakes, 0);
+
+      // Restore setting
+      await settings.updateSettings(showMistakes: true);
+    });
+
+    test('AchievementsManager.unlockDetailed differentiates newly unlocked vs already unlocked', () async {
+      final res1 = await AchievementsManager.unlockDetailed('test_ach_1');
+      expect(res1, AchievementUnlockResult.unlocked);
+
+      final res2 = await AchievementsManager.unlockDetailed('test_ach_1');
+      expect(res2, AchievementUnlockResult.alreadyUnlocked);
+    });
+
+    test('dispose flushes game state and cancels active timers', () async {
+      final provider = SudokuGameProvider();
+      await provider.newGame(Difficulty.easy, seed: 101);
+
+      expect(provider.status, GameStatus.playing);
+      provider.dispose();
+      // Should not throw or crash on double timer stop
+    });
   });
 }

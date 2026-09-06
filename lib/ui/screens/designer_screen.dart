@@ -100,12 +100,38 @@ class _DesignerScreenState extends State<DesignerScreen> {
   }
 
   void _exportPrintableSheet() {
-    AudioService.playVictory();
+    if (!SudokuLogic.isBoardValid(_grid)) {
+      AudioService.playError();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Cannot export: Grid contains rule violations (duplicate digits)!',
+          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
     final List<List<int>> copy = List.generate(
       9,
       (r) => List<int>.from(_grid[r]),
     );
-    SudokuLogic.solve(copy);
+    final isSolvable = SudokuLogic.solve(copy);
+    if (!isSolvable) {
+      AudioService.playError();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Cannot export: This puzzle layout has no valid solution.',
+          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    AudioService.playVictory();
 
     final html = PdfExporter.generatePrintableHtml(
       board: _grid,

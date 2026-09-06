@@ -126,7 +126,7 @@ class DailyChallengeManager {
       await prefs.setInt(_bestStreakKey, bestStreak);
 
       if (currentStreak >= 7 || bestStreak >= 7) {
-        AchievementsManager.unlock('streak_7');
+        await AchievementsManager.unlock('streak_7');
       }
     } catch (e) {
       debugPrint('Error marking date completed: $e');

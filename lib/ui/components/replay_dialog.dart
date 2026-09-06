@@ -98,6 +98,15 @@ class _ReplayDialogState extends State<ReplayDialog> {
   }
 
   List<List<int>> _computeBoardAtStep(int step) {
+    if (step <= 0 || widget.moveHistory.isEmpty) {
+      return SudokuLogic.copyBoard(widget.initialBoard);
+    }
+    final targetIndex = (step - 1).clamp(0, widget.moveHistory.length - 1);
+    final targetMove = widget.moveHistory[targetIndex];
+    if (targetMove.snapshot != null) {
+      return SudokuLogic.copyBoard(targetMove.snapshot!.board);
+    }
+
     final board = SudokuLogic.copyBoard(widget.initialBoard);
     for (int i = 0; i < step && i < widget.moveHistory.length; i++) {
       final move = widget.moveHistory[i];

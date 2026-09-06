@@ -45,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final hasSaved = prefs.getBool(PrefsKeys.hasSavedGame) ?? false;
+      if (!mounted) return;
       if (hasSaved) {
         setState(() {
           _hasSavedGame = true;
@@ -71,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final today = DateTime.now();
       final todayStr =
           '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      if (!mounted) return;
       setState(() {
         _isTodayCompleted = list.contains(todayStr);
       });
@@ -191,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     final theme = Theme.of(context);
 
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: theme.colorScheme.surface,

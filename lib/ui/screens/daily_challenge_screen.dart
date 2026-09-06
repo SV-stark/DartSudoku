@@ -66,7 +66,9 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
       ),
     ).then((_) {
       // Reload completions after returning in case the challenge was completed
-      _loadCompletions();
+      if (mounted) {
+        _loadCompletions();
+      }
     });
   }
 
@@ -166,10 +168,13 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
             IconButton(
               onPressed: () {
                 setState(() {
-                  _selectedMonth = DateTime(
-                    _selectedMonth.year,
-                    _selectedMonth.month - 1,
-                  );
+                  int year = _selectedMonth.year;
+                  int month = _selectedMonth.month - 1;
+                  if (month < 1) {
+                    month = 12;
+                    year--;
+                  }
+                  _selectedMonth = DateTime(year, month);
                 });
               },
               icon: const Icon(Icons.chevron_left_rounded),
@@ -184,10 +189,13 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
             IconButton(
               onPressed: () {
                 setState(() {
-                  _selectedMonth = DateTime(
-                    _selectedMonth.year,
-                    _selectedMonth.month + 1,
-                  );
+                  int year = _selectedMonth.year;
+                  int month = _selectedMonth.month + 1;
+                  if (month > 12) {
+                    month = 1;
+                    year++;
+                  }
+                  _selectedMonth = DateTime(year, month);
                 });
               },
               icon: const Icon(Icons.chevron_right_rounded),
@@ -201,7 +209,8 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
   Widget _buildCalendarGrid(int daysInMonth, int firstDayOffset) {
     final weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     final theme = Theme.of(context);
-    final today = DateTime.now();
+    final now = DateTime.now();
+    final todayDate = DateTime(now.year, now.month, now.day);
 
     List<Widget> dayWidgets = [];
 
@@ -232,10 +241,10 @@ class _DailyChallengeScreenState extends State<DailyChallengeScreen> {
           '${cellDate.year}-${cellDate.month.toString().padLeft(2, '0')}-${cellDate.day.toString().padLeft(2, '0')}';
       final bool isCompleted = _completedDates.contains(cellDateStr);
       final bool isToday =
-          today.year == cellDate.year &&
-          today.month == cellDate.month &&
-          today.day == cellDate.day;
-      final bool isFuture = cellDate.isAfter(today);
+          todayDate.year == cellDate.year &&
+          todayDate.month == cellDate.month &&
+          todayDate.day == cellDate.day;
+      final bool isFuture = cellDate.isAfter(todayDate);
 
       final difficulty = _getDifficultyForDay(cellDate);
       final diffColor = AppTheme.getDifficultyColor(difficulty);

@@ -515,7 +515,9 @@ class _SolverScreenState extends State<SolverScreen> {
           ],
         );
       },
-    );
+    ).then((_) {
+      textController.dispose();
+    });
   }
 
   Widget _buildHeader() {

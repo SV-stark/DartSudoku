@@ -28,6 +28,12 @@ class Achievement {
   }
 }
 
+enum AchievementUnlockResult {
+  unlocked,
+  alreadyUnlocked,
+  error,
+}
+
 /// Manages unlockable badges and trophy progress.
 class AchievementsManager {
   static const String _unlockedKey = 'unlocked_achievements';
@@ -80,19 +86,28 @@ class AchievementsManager {
     }
   }
 
-  /// Unlocks an achievement by ID.
-  static Future<bool> unlock(String achievementId) async {
+  /// Unlocks an achievement by ID with detailed status.
+  static Future<AchievementUnlockResult> unlockDetailed(
+    String achievementId,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final unlockedList = prefs.getStringList(_unlockedKey) ?? [];
       if (!unlockedList.contains(achievementId)) {
         unlockedList.add(achievementId);
         await prefs.setStringList(_unlockedKey, unlockedList);
-        return true; // Newly unlocked!
+        return AchievementUnlockResult.unlocked;
       }
-    } catch (e) {
-      debugPrint('Error unlocking achievement: $e');
+      return AchievementUnlockResult.alreadyUnlocked;
+    } catch (e, stack) {
+      debugPrint('Error unlocking achievement "$achievementId": $e\n$stack');
+      return AchievementUnlockResult.error;
     }
-    return false;
+  }
+
+  /// Unlocks an achievement by ID. Returns true if newly unlocked.
+  static Future<bool> unlock(String achievementId) async {
+    final result = await unlockDetailed(achievementId);
+    return result == AchievementUnlockResult.unlocked;
   }
 }

@@ -24,6 +24,7 @@ class GameScreen extends StatefulWidget {
   final String? dailyChallengeDate;
   final SudokuVariant variant;
   final bool resumeSavedGame;
+  final SudokuPuzzle? initialPuzzle;
 
   const GameScreen({
     super.key,
@@ -31,7 +32,17 @@ class GameScreen extends StatefulWidget {
     this.dailyChallengeDate,
     this.variant = SudokuVariant.standard,
     this.resumeSavedGame = false,
+    this.initialPuzzle,
   });
+
+  const GameScreen.fromPuzzle({
+    super.key,
+    required SudokuPuzzle puzzle,
+    required this.difficulty,
+    this.variant = SudokuVariant.standard,
+  })  : initialPuzzle = puzzle,
+        dailyChallengeDate = null,
+        resumeSavedGame = false;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -40,6 +51,11 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late SudokuGameProvider _provider;
   late final FocusNode _focusNode;
+  bool _hasHandledWin = false;
+  bool _hasHandledGameOver = false;
+  bool _isShowingMistakeDialog = false;
+  Map<String, double>? _cachedHeatmap;
+  int _cachedHeatmapMoveCount = -1;
 
   @override
   void initState() {
@@ -50,8 +66,27 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _focusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
-        if (widget.resumeSavedGame) {
+        if (widget.initialPuzzle != null) {
+          await _provider.loadPuzzle(
+            widget.initialPuzzle!,
+            widget.difficulty,
+            variant: widget.variant,
+          );
+        } else if (widget.resumeSavedGame) {
           await _provider.loadSavedGame();
+          if (_provider.status == GameStatus.idle) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('No active saved game found. Starting a fresh game.'),
+                ),
+              );
+            }
+            await _provider.newGame(
+              widget.difficulty,
+              variant: widget.variant,
+            );
+          }
         } else {
           await _provider.newGame(
             widget.difficulty,
@@ -78,42 +113,56 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _onStateChange() {
     if (mounted) {
-      if (_provider.lastMistakeDiagnostic != null) {
+      if (_provider.lastMistakeDiagnostic != null && !_isShowingMistakeDialog) {
         final diag = _provider.lastMistakeDiagnostic!;
+        _provider.clearMistakeDiagnostic();
+        _isShowingMistakeDialog = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _provider.clearMistakeDiagnostic();
+          if (!mounted) {
+            _isShowingMistakeDialog = false;
+            return;
+          }
           _showMistakeDiagnosticDialog(diag);
         });
       }
       if (_provider.status == GameStatus.won) {
-        AudioService.playVictory();
-        AchievementsManager.unlock('first_win');
-        if (_provider.elapsedSeconds < 180) {
-          AchievementsManager.unlock('speed_demon');
-        }
-        if (widget.difficulty == Difficulty.hard && _provider.hintsUsed == 0) {
-          AchievementsManager.unlock('master_tactician');
-        }
-        if (widget.dailyChallengeDate != null) {
-          _recordDailyChallengeSuccess();
-          try {
-            final parts = widget.dailyChallengeDate!.split('-');
-            if (parts.length == 3) {
-              final challengeDate = DateTime(
-                int.parse(parts[0]),
-                int.parse(parts[1]),
-                int.parse(parts[2]),
-              );
-              DailyChallengeManager.markDateCompleted(challengeDate);
-            } else {
+        if (!_hasHandledWin) {
+          _hasHandledWin = true;
+          AudioService.playVictory();
+          AchievementsManager.unlock('first_win');
+          if (_provider.elapsedSeconds < 180) {
+            AchievementsManager.unlock('speed_demon');
+          }
+          if (widget.difficulty == Difficulty.hard && _provider.hintsUsed == 0) {
+            AchievementsManager.unlock('master_tactician');
+          }
+          if (widget.dailyChallengeDate != null) {
+            _recordDailyChallengeSuccess();
+            try {
+              final parts = widget.dailyChallengeDate!.split('-');
+              if (parts.length == 3) {
+                final challengeDate = DateTime(
+                  int.parse(parts[0]),
+                  int.parse(parts[1]),
+                  int.parse(parts[2]),
+                );
+                DailyChallengeManager.markDateCompleted(challengeDate);
+              } else {
+                DailyChallengeManager.markDateCompleted(DateTime.now());
+              }
+            } catch (_) {
               DailyChallengeManager.markDateCompleted(DateTime.now());
             }
-          } catch (_) {
-            DailyChallengeManager.markDateCompleted(DateTime.now());
           }
         }
       } else if (_provider.status == GameStatus.gameOver) {
-        AudioService.playError();
+        if (!_hasHandledGameOver) {
+          _hasHandledGameOver = true;
+          AudioService.playError();
+        }
+      } else if (_provider.status == GameStatus.playing) {
+        _hasHandledWin = false;
+        _hasHandledGameOver = false;
       }
       setState(() {});
     }
@@ -156,12 +205,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ],
         );
       },
-    );
+    ).then((_) {
+      if (mounted) {
+        _isShowingMistakeDialog = false;
+      }
+    });
   }
 
   Map<String, double> _calculateHesitationHeatmap() {
+    if (_provider.moveHistory.isEmpty) return const {};
+    if (_cachedHeatmap != null &&
+        _cachedHeatmapMoveCount == _provider.moveHistory.length) {
+      return _cachedHeatmap!;
+    }
     final map = <String, double>{};
-    if (_provider.moveHistory.isEmpty) return map;
     int maxDur = 1;
     for (var m in _provider.moveHistory) {
       if (m.durationMs > maxDur) maxDur = m.durationMs;
@@ -170,6 +227,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       double score = (m.durationMs / maxDur).clamp(0.0, 1.0);
       map['${m.row},${m.col}'] = score;
     }
+    _cachedHeatmap = map;
+    _cachedHeatmapMoveCount = _provider.moveHistory.length;
     return map;
   }
 
@@ -244,11 +303,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       final isShiftActive = HardwareKeyboard.instance.isShiftPressed;
       final isNotesMode = _provider.notesMode;
 
-      if (isShiftActive && !isNotesMode) {
-        // Temporarily act as notes mode
-        _provider.toggleNotesMode();
-        _provider.enterNumber(number);
-        _provider.toggleNotesMode();
+      if (isShiftActive) {
+        _provider.enterNumber(number, asNote: !isNotesMode);
       } else {
         _provider.enterNumber(number);
       }
@@ -429,7 +485,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 padding: const EdgeInsets.all(8.0),
                 child: _provider.status == GameStatus.loading
                     ? _buildLoadingState()
-                    : AnimatedBuilder(
+                    : _provider.status == GameStatus.error
+                        ? _buildErrorState()
+                        : AnimatedBuilder(
                         animation: Listenable.merge([
                           _provider,
                           _provider.selectionNotifier,
@@ -529,7 +587,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 child: Center(
                   child: _provider.status == GameStatus.loading
                       ? _buildLoadingState()
-                      : AnimatedBuilder(
+                      : _provider.status == GameStatus.error
+                          ? _buildErrorState()
+                          : AnimatedBuilder(
                           animation: Listenable.merge([
                             _provider,
                             _provider.selectionNotifier,
@@ -808,6 +868,64 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 28.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: theme.colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Generation Failed',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _provider.errorMessage ??
+                  'An error occurred while preparing the puzzle.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () {
+                if (widget.initialPuzzle != null) {
+                  _provider.loadPuzzle(
+                    widget.initialPuzzle!,
+                    widget.difficulty,
+                    variant: widget.variant,
+                  );
+                } else {
+                  _provider.newGame(
+                    widget.difficulty,
+                    dailyDate: widget.dailyChallengeDate,
+                    variant: widget.variant,
+                  );
+                }
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('RETRY'),
             ),
           ],
         ),

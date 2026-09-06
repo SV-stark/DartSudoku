@@ -76,6 +76,22 @@ class SudokuGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final gridTheme = _GridTheme(context);
 
+    // Pre-index killer cages once per build to avoid 81x firstWhere & reduce scans
+    final Map<int, KillerCage> cageMap = {};
+    final Map<int, int> cageSumMap = {};
+    if (variant == SudokuVariant.killer && killerCages != null) {
+      for (final cage in killerCages!) {
+        if (cage.cells.isEmpty) continue;
+        final firstCell = cage.cells.reduce(
+          (a, b) => (a.x < b.x || (a.x == b.x && a.y < b.y)) ? a : b,
+        );
+        cageSumMap[firstCell.x * 9 + firstCell.y] = cage.targetSum;
+        for (final cell in cage.cells) {
+          cageMap[cell.x * 9 + cell.y] = cage;
+        }
+      }
+    }
+
     return RepaintBoundary(
       child: AspectRatio(
         aspectRatio: 1.0,
@@ -92,8 +108,13 @@ class SudokuGrid extends StatelessWidget {
                 child: Row(
                   children: List.generate(9, (c) {
                     return Expanded(
-                      child: RepaintBoundary(
-                        child: _buildCell(context, r, c, gridTheme),
+                      child: _buildCell(
+                        context,
+                        r,
+                        c,
+                        gridTheme,
+                        cageMap,
+                        cageSumMap,
                       ),
                     );
                   }),
@@ -106,7 +127,14 @@ class SudokuGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildCell(BuildContext context, int r, int c, _GridTheme gridTheme) {
+  Widget _buildCell(
+    BuildContext context,
+    int r,
+    int c,
+    _GridTheme gridTheme,
+    Map<int, KillerCage> cageMap,
+    Map<int, int> cageSumMap,
+  ) {
     final int value = board[r][c];
     final bool isSelected = r == selectedRow && c == selectedCol;
 
@@ -173,22 +201,9 @@ class SudokuGrid extends StatelessWidget {
     }
 
     // Killer Cage lookup
-    KillerCage? cage;
     int? cageSumLabel;
-    if (variant == SudokuVariant.killer && killerCages != null) {
-      cage = killerCages!.firstWhere(
-        (cg) => cg.containsCell(r, c),
-        orElse: () => const KillerCage(id: -1, cells: [], targetSum: 0),
-      );
-      if (cage.id != -1) {
-        // If this is top-left most cell of cage, display target sum
-        final firstCell = cage.cells.reduce(
-          (a, b) => (a.x < b.x || (a.x == b.x && a.y < b.y)) ? a : b,
-        );
-        if (firstCell.x == r && firstCell.y == c) {
-          cageSumLabel = cage.targetSum;
-        }
-      }
+    if (variant == SudokuVariant.killer) {
+      cageSumLabel = cageSumMap[r * 9 + c];
     }
 
     // Material 3 Borders

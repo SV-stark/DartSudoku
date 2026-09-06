@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'package:flutter/material.dart';
 import '../../core/difficulty.dart';
 import '../../core/sudoku_analyzer.dart';
@@ -80,22 +81,38 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
       _isGenerating = true;
     });
 
-    SudokuAnalyzer.generateTargetedPuzzle(
-      _selectedStrategy,
-      _selectedDifficulty,
-    );
+    final strategy = _selectedStrategy;
+    final diff = _selectedDifficulty;
 
-    if (!mounted) return;
-    Navigator.pop(context); // Close dialog
+    try {
+      final puzzle = await Isolate.run(
+        () => SudokuAnalyzer.generateTargetedPuzzle(strategy, diff),
+      );
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => GameScreen(
-          difficulty: _selectedDifficulty,
+      if (!mounted) return;
+      Navigator.pop(context); // Close dialog
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => GameScreen.fromPuzzle(
+            puzzle: puzzle,
+            difficulty: diff,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isGenerating = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to generate targeted puzzle: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   @override
