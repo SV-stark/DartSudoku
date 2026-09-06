@@ -2,6 +2,15 @@
 
 An elegant, modern Sudoku game and solver built with Flutter. DartSudoku implements a clean Material 3 design and uses a robust backtracking engine to deliver a highly interactive Sudoku playing and solving experience.
 
+[![GitHub Release](https://img.shields.io/github/v/release/SV-stark/DartSudoku?style=for-the-badge&logo=github&color=6366f1)](https://github.com/SV-stark/DartSudoku/releases/latest)
+[![Total Downloads](https://img.shields.io/github/downloads/SV-stark/DartSudoku/total?style=for-the-badge&logo=apachespark&color=10b981)](https://github.com/SV-stark/DartSudoku/releases)
+[![Latest Downloads](https://img.shields.io/github/downloads/SV-stark/DartSudoku/latest/total?style=for-the-badge&color=06b6d4)](https://github.com/SV-stark/DartSudoku/releases/latest)
+[![Build & Release App](https://img.shields.io/github/actions/workflow/status/SV-stark/DartSudoku/release.yml?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/SV-stark/DartSudoku/actions/workflows/release.yml)
+[![Flutter](https://img.shields.io/badge/Flutter-3.20+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-amber?style=for-the-badge)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/SV-stark/DartSudoku?style=for-the-badge&color=eab308)](https://github.com/SV-stark/DartSudoku/stargazers)
+[![Open Issues](https://img.shields.io/github/issues/SV-stark/DartSudoku?style=for-the-badge&color=f43f5e)](https://github.com/SV-stark/DartSudoku/issues)
+
 ---
 
 ## ✨ Features
