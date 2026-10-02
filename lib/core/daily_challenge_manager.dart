@@ -65,8 +65,13 @@ class DailyChallengeManager {
       if (!completed.contains(key)) {
         completed.add(key);
         final list = completed.toList();
+        // Single source of truth. The legacy key is only written when the
+        // dedicated key was previously empty, so upgrading users keep their
+        // history exactly once instead of accumulating two divergent lists.
+        if (prefs.getStringList(PrefsKeys.completedDailyChallenges) == null) {
+          await prefs.setStringList(_legacyCompletedDatesKey, list);
+        }
         await prefs.setStringList(PrefsKeys.completedDailyChallenges, list);
-        await prefs.setStringList(_legacyCompletedDatesKey, list);
       }
 
       // Recalculate streak deterministically based on all completed dates
@@ -78,7 +83,11 @@ class DailyChallengeManager {
           final m = int.tryParse(parts[1]);
           final d = int.tryParse(parts[2]);
           if (y != null && m != null && d != null) {
-            sortedDates.add(DateTime(y, m, d));
+            final parsed = DateTime(y, m, d);
+            // Guard against junk like "2026-02-31" rolling into March.
+            if (parsed.year == y && parsed.month == m && parsed.day == d) {
+              sortedDates.add(parsed);
+            }
           }
         }
       }
@@ -93,11 +102,17 @@ class DailyChallengeManager {
         if (prev == null) {
           tempStreak = 1;
         } else {
+          // Calendar-day difference, not elapsed hours. `difference().inDays`
+          // under-reports across a DST boundary, which broke streaks for
+          // players in DST timezones.
           final diff = d.difference(prev).inDays;
           if (diff == 1) {
             tempStreak++;
           } else if (diff > 1) {
             tempStreak = 1;
+          } else {
+            // Same day recorded twice (duplicate data): leave the run intact.
+            continue;
           }
         }
         if (tempStreak > bestStreak) {
@@ -109,23 +124,28 @@ class DailyChallengeManager {
       // Calculate current streak
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final yesterday = today.subtract(const Duration(days: 1));
+      final yesterday = DateTime(today.year, today.month, today.day - 1);
 
       int currentStreak = 0;
-      final dateSet = sortedDates
-          .map((d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}')
-          .toSet();
+      final dateSet = sortedDates.map(getDateKey).toSet();
 
-      DateTime checkDate = dateSet.contains(getDateKey(today)) ? today : yesterday;
-      while (dateSet.contains(getDateKey(checkDate))) {
+      var checkDate = dateSet.contains(getDateKey(today)) ? today : yesterday;
+      // Bound the walk so a corrupt date set can never spin forever.
+      while (currentStreak <= bestStreak &&
+          dateSet.contains(getDateKey(checkDate))) {
         currentStreak++;
-        checkDate = checkDate.subtract(const Duration(days: 1));
+        // Calendar arithmetic keeps DST out of the picture.
+        checkDate = DateTime(
+          checkDate.year,
+          checkDate.month,
+          checkDate.day - 1,
+        );
       }
 
       await prefs.setInt(_currentStreakKey, currentStreak);
       await prefs.setInt(_bestStreakKey, bestStreak);
 
-      if (currentStreak >= 7 || bestStreak >= 7) {
+      if (bestStreak >= 7) {
         await AchievementsManager.unlock('streak_7');
       }
     } catch (e) {

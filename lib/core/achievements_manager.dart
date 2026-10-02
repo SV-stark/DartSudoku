@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -37,6 +39,23 @@ enum AchievementUnlockResult {
 /// Manages unlockable badges and trophy progress.
 class AchievementsManager {
   static const String _unlockedKey = 'unlocked_achievements';
+
+  /// Tail of the serialisation chain used by [_synchronized].
+  static Future<void> _lock = Future<void>.value();
+
+  /// Runs [action] after every previously queued action has settled, so
+  /// read-modify-write cycles against SharedPreferences cannot interleave.
+  static Future<T> _synchronized<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _lock = _lock.catchError((Object _) {}).then((_) async {
+      try {
+        completer.complete(await action());
+      } catch (e, stack) {
+        completer.completeError(e, stack);
+      }
+    });
+    return completer.future;
+  }
 
   static final List<Achievement> _defaultAchievements = [
     const Achievement(
@@ -87,21 +106,42 @@ class AchievementsManager {
   }
 
   /// Unlocks an achievement by ID with detailed status.
+  ///
+  /// Serialised through [_lock]: two concurrent unlocks (e.g. a daily-challenge
+  /// streak firing at the same moment as a win) each read the list, added their
+  /// own ID and wrote it back, so the slower write clobbered the faster one and
+  /// an achievement was silently lost.
   static Future<AchievementUnlockResult> unlockDetailed(
     String achievementId,
-  ) async {
+  ) {
+    return _synchronized(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final unlockedList = prefs.getStringList(_unlockedKey) ?? [];
+        if (unlockedList.contains(achievementId)) {
+          return AchievementUnlockResult.alreadyUnlocked;
+        }
+        await prefs.setStringList(_unlockedKey, [
+          ...unlockedList,
+          achievementId,
+        ]);
+        return AchievementUnlockResult.unlocked;
+      } catch (e, stack) {
+        debugPrint(
+          'Error unlocking achievement "$achievementId": $e\n$stack',
+        );
+        return AchievementUnlockResult.error;
+      }
+    });
+  }
+
+  /// Clears every unlocked achievement. Used by "reset all progress".
+  static Future<void> resetAchievements() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final unlockedList = prefs.getStringList(_unlockedKey) ?? [];
-      if (!unlockedList.contains(achievementId)) {
-        unlockedList.add(achievementId);
-        await prefs.setStringList(_unlockedKey, unlockedList);
-        return AchievementUnlockResult.unlocked;
-      }
-      return AchievementUnlockResult.alreadyUnlocked;
+      await prefs.remove(_unlockedKey);
     } catch (e, stack) {
-      debugPrint('Error unlocking achievement "$achievementId": $e\n$stack');
-      return AchievementUnlockResult.error;
+      debugPrint('Error resetting achievements: $e\n$stack');
     }
   }
 

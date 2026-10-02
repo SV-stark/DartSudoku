@@ -6,6 +6,7 @@ import '../../core/difficulty.dart';
 import '../../core/sudoku_logic.dart';
 import '../../core/services/audio_service.dart';
 import '../../core/achievements_manager.dart';
+import '../../core/daily_challenge_manager.dart';
 import '../theme.dart';
 import 'game_screen.dart';
 
@@ -66,9 +67,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkTodayCompletion() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final list =
-          prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
+      // Go through DailyChallengeManager rather than reading the raw key, so
+      // completions recorded by older builds under the legacy key still count.
+      // Reading only the new key made a completed day look unplayed.
+      final list = await DailyChallengeManager.getCompletedDates();
       final today = DateTime.now();
       final todayStr =
           '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
@@ -739,12 +741,41 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _resumeSavedGame() {
-    Navigator.push(
+  Future<void> _resumeSavedGame() async {
+    // Read the saved difficulty and variant rather than passing placeholders.
+    // The provider restores them itself, but the GameScreen header badge and
+    // its "start over" fallbacks are derived from the constructor arguments,
+    // so handing it `easy`/`standard` made a resumed hard killer game render as
+    // an easy standard one before the async load landed.
+    Difficulty difficulty = Difficulty.easy;
+    SudokuVariant variant = SudokuVariant.standard;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final diffName = prefs.getString(PrefsKeys.savedDifficulty);
+      if (diffName != null) {
+        difficulty = Difficulty.values.firstWhere(
+          (d) => d.name == diffName,
+          orElse: () => Difficulty.easy,
+        );
+      }
+      final variantName = prefs.getString(PrefsKeys.savedVariant);
+      if (variantName != null) {
+        variant = SudokuVariant.values.firstWhere(
+          (v) => v.name == variantName,
+          orElse: () => SudokuVariant.standard,
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('Error reading saved game metadata in HomeScreen: $e\n$stack');
+    }
+
+    if (!mounted) return;
+    await Navigator.push(
       context,
       FadePageRoute(
-        child: const GameScreen(
-          difficulty: Difficulty.easy,
+        child: GameScreen(
+          difficulty: difficulty,
+          variant: variant,
           resumeSavedGame: true,
         ),
       ),
@@ -769,7 +800,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       child: InkWell(
-        onTap: _resumeSavedGame,
+        onTap: () {
+          _resumeSavedGame();
+        },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(20.0),

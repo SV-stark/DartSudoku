@@ -30,6 +30,8 @@ class PrefsKeys {
   static const String savedNotes = 'saved_notes';
   static const String savedMistakes = 'saved_mistakes';
   static const String savedElapsedSeconds = 'saved_elapsed_seconds';
+  static const String savedHintsUsed = 'saved_hints_used';
+  static const String savedCellColors = 'saved_cell_colors';
   static const String hasSavedGame = 'has_saved_game';
 
   // Daily Challenge Keys

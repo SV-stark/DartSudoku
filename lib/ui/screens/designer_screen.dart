@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'dart:isolate';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/sudoku_logic.dart';
 import '../../core/pdf_exporter.dart';
 import '../../core/services/audio_service.dart';
+import '../../core/constants.dart';
 import '../components/sudoku_grid.dart';
 import '../components/numpad.dart';
 import '../components/custom_answers_dialog.dart';
@@ -16,13 +21,28 @@ class DesignerScreen extends StatefulWidget {
 
 
 class _DesignerScreenState extends State<DesignerScreen> {
-  final List<List<int>> _grid = List.generate(9, (_) => List.filled(9, 0));
+  final List<List<int>> _grid = List.generate(
+    GameConstants.boardSize,
+    (_) => List.filled(GameConstants.boardSize, 0),
+  );
   int _selectedRow = 0;
   int _selectedCol = 0;
 
   bool _isValid = true;
   bool _hasUniqueSolution = false;
+  bool _isChecking = false;
   String _statusMessage = 'Enter clues to test puzzle uniqueness.';
+
+  /// Uniqueness solving is a backtracking search. On a near-empty grid it can
+  /// run for seconds, so it is debounced off the keystroke and executed in a
+  /// background isolate instead of blocking the UI thread on every edit.
+  Timer? _validationDebounce;
+  int _validationRunId = 0;
+
+  /// Minimum clues before a Sudoku can have exactly one solution.
+  static const int _minCluesForUnique = 17;
+
+  static const Duration _debounceDelay = Duration(milliseconds: 350);
 
   @override
   void initState() {
@@ -30,45 +50,89 @@ class _DesignerScreenState extends State<DesignerScreen> {
     _validateBoard();
   }
 
+  @override
+  void dispose() {
+    _validationDebounce?.cancel();
+    super.dispose();
+  }
+
+  static int _countClues(List<List<int>> board) {
+    var count = 0;
+    for (final row in board) {
+      for (final value in row) {
+        if (value != 0) count++;
+      }
+    }
+    return count;
+  }
+
   void _validateBoard() {
+    // Invalidate any in-flight uniqueness run so a stale result can't overwrite
+    // a newer one.
+    _validationRunId++;
+
     final valid = SudokuLogic.isBoardValid(_grid);
+    final clueCount = _countClues(_grid);
+
+    _validationDebounce?.cancel();
+
     if (!valid) {
       setState(() {
         _isValid = false;
         _hasUniqueSolution = false;
+        _isChecking = false;
         _statusMessage = 'Rule Violation: Duplicate numbers in row, col, or box.';
       });
       return;
     }
 
-    final clueCount = _grid.fold<int>(
-      0,
-      (sum, row) => sum + row.where((val) => val != 0).length,
-    );
-
-    if (clueCount < 17) {
+    if (clueCount < _minCluesForUnique) {
       setState(() {
         _isValid = true;
         _hasUniqueSolution = false;
-        _statusMessage = 'Need at least 17 clues for a unique Sudoku puzzle ($clueCount entered).';
+        _isChecking = false;
+        _statusMessage =
+            'Need at least $_minCluesForUnique clues for a unique Sudoku puzzle ($clueCount entered).';
       });
       return;
     }
 
-    final unique = SudokuLogic.hasUniqueSolution(_grid);
-    if (unique) {
-      setState(() {
-        _isValid = true;
-        _hasUniqueSolution = true;
-        _statusMessage = 'Valid Unique Sudoku Puzzle! Guaranteed 1 solution.';
-      });
-    } else {
-      setState(() {
-        _isValid = true;
-        _hasUniqueSolution = false;
-        _statusMessage = 'Multiple solutions possible. Add more clues to restrict solution.';
-      });
-    }
+    setState(() {
+      _isValid = true;
+      _isChecking = true;
+      _statusMessage = 'Checking for a unique solution...';
+    });
+
+    final runId = _validationRunId;
+    final snapshot = List.generate(
+      GameConstants.boardSize,
+      (r) => List<int>.from(_grid[r]),
+    );
+
+    _validationDebounce = Timer(_debounceDelay, () {
+      Isolate.run(() => SudokuLogic.hasUniqueSolution(snapshot)).then(
+        (unique) {
+          if (!mounted || runId != _validationRunId) return;
+          setState(() {
+            _isChecking = false;
+            _hasUniqueSolution = unique;
+            _statusMessage = unique
+                ? 'Valid Unique Sudoku Puzzle! Guaranteed 1 solution.'
+                : 'Multiple solutions possible. Add more clues to restrict solution.';
+          });
+        },
+        onError: (Object error) {
+          if (!mounted || runId != _validationRunId) return;
+          debugPrint('Designer uniqueness check failed: $error');
+          setState(() {
+            _isChecking = false;
+            _hasUniqueSolution = false;
+            _statusMessage =
+                'Could not verify uniqueness right now. Try again.';
+          });
+        },
+      );
+    });
   }
 
   void _onNumberTap(int num) {
@@ -90,8 +154,8 @@ class _DesignerScreenState extends State<DesignerScreen> {
   void _clearBoard() {
     AudioService.playCellSelect();
     setState(() {
-      for (int r = 0; r < 9; r++) {
-        for (int c = 0; c < 9; c++) {
+      for (int r = 0; r < GameConstants.boardSize; r++) {
+        for (int c = 0; c < GameConstants.boardSize; c++) {
           _grid[r][c] = 0;
         }
       }
@@ -99,7 +163,7 @@ class _DesignerScreenState extends State<DesignerScreen> {
     _validateBoard();
   }
 
-  void _exportPrintableSheet() {
+  Future<void> _exportPrintableSheet() async {
     if (!SudokuLogic.isBoardValid(_grid)) {
       AudioService.playError();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -113,12 +177,19 @@ class _DesignerScreenState extends State<DesignerScreen> {
       return;
     }
 
-    final List<List<int>> copy = List.generate(
-      9,
-      (r) => List<int>.from(_grid[r]),
-    );
-    final isSolvable = SudokuLogic.solve(copy);
-    if (!isSolvable) {
+    // Backtracking on an ambiguous grid can take a while — keep it off the
+    // UI thread.
+    final solved = await Isolate.run(() {
+      final working = List.generate(
+        GameConstants.boardSize,
+        (r) => List<int>.from(_grid[r]),
+      );
+      return SudokuLogic.solve(working) ? working : null;
+    });
+
+    if (!mounted) return;
+
+    if (solved == null) {
       AudioService.playError();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -135,31 +206,58 @@ class _DesignerScreenState extends State<DesignerScreen> {
 
     final html = PdfExporter.generatePrintableHtml(
       board: _grid,
-      solvedBoard: copy,
+      solvedBoard: solved,
       title: 'Custom Designed Puzzle',
       difficulty: _hasUniqueSolution ? 'Unique Solution' : 'Custom Layout',
     );
 
-    showDialog(
+    if (!mounted) return;
+
+    final clipboard = ClipboardData(text: html);
+    // Captured before the await so the confirmation snackbar does not reach
+    // through a stale BuildContext.
+    final messenger = ScaffoldMessenger.of(context);
+
+    await showDialog<void>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Row(
             children: [
               Icon(Icons.print_rounded, color: Colors.indigo),
               SizedBox(width: 10),
-              Text('Printable HTML Worksheet'),
+              Expanded(child: Text('Printable HTML Worksheet')),
             ],
           ),
-          content: SingleChildScrollView(
-            child: SelectableText(
-              html,
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: SelectableText(
+                html,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
             ),
           ),
           actions: [
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(clipboard);
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Worksheet HTML copied. Paste it into any text editor and '
+                      'print, or save it as .html and open it in a browser.',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.copy_all_rounded, size: 18),
+              label: const Text('COPY HTML'),
+            ),
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('CLOSE'),
             ),
           ],
@@ -237,6 +335,17 @@ class _DesignerScreenState extends State<DesignerScreen> {
                           ),
                         ),
                       ),
+                      if (_isChecking) ...[
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: theme.colorScheme.secondary,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

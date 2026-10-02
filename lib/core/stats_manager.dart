@@ -177,17 +177,32 @@ class StatsManager {
   static Future<void> recordGameStart(Difficulty difficulty) {
     return _synchronized(() async {
       final stats = await getStats();
-      stats.difficultyStats[difficulty.name]?.gamesPlayed++;
+      // putIfAbsent so an unknown difficulty still creates its bucket instead of
+      // silently dropping the increment via a null-aware no-op.
+      final entry = stats.difficultyStats.putIfAbsent(
+        difficulty.name,
+        SudokuStats.new,
+      );
+      entry.gamesPlayed++;
       await saveStats(stats);
     });
   }
 
   /// Increment won games, update best/total time, and update win streaks safely
-  static Future<void> recordGameWin(Difficulty difficulty, int seconds) {
+  static Future<void> recordGameWin(Difficulty difficulty, int rawSeconds) {
     return _synchronized(() async {
       final stats = await getStats();
       final diff = difficulty.name;
-      final diffStats = stats.difficultyStats[diff]!;
+      // putIfAbsent instead of a force-unwrap: an unknown/renamed difficulty
+      // used to throw a null-check error and silently drop the whole win.
+      final diffStats = stats.difficultyStats.putIfAbsent(
+        diff,
+        SudokuStats.new,
+      );
+
+      // Guard against a bogus/negative duration poisoning averages and
+      // permanently locking in a zero "best time".
+      final seconds = rawSeconds > 0 ? rawSeconds : 0;
 
       diffStats.gamesWon++;
       diffStats.totalTime += seconds;

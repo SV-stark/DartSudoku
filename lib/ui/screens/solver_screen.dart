@@ -49,6 +49,14 @@ class _SolverScreenState extends State<SolverScreen> {
   void _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return;
 
+    // Ignore system shortcuts (Ctrl+S, Alt+1, ...) so they don't quietly
+    // scribble digits into the grid.
+    if (HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isAltPressed ||
+        HardwareKeyboard.instance.isMetaPressed) {
+      return;
+    }
+
     final key = event.logicalKey;
 
     // Numbers 1-9
@@ -487,18 +495,10 @@ class _SolverScreenState extends State<SolverScreen> {
                 final parsed = SudokuOCRScanner.parseSDKString(
                   textController.text.trim(),
                 );
-                if (parsed != null) {
-                  for (int r = 0; r < 9; r++) {
-                    for (int c = 0; c < 9; c++) {
-                      _provider.selectCell(r, c);
-                      if (parsed[r][c] != 0) {
-                        _provider.enterNumber(parsed[r][c]);
-                      } else {
-                        _provider.clearCell();
-                      }
-                    }
-                  }
-                  AudioService.playVictory();
+                if (parsed != null && _provider.loadBoard(parsed)) {
+                  // A successful load is an action, not an achievement —
+                  // playCellSelect rather than the victory cue.
+                  AudioService.playCellSelect();
                   Navigator.pop(context);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(

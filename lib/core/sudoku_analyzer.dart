@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'constants.dart';
 import 'difficulty.dart';
 import 'sudoku_logic.dart';
+import 'sudoku_techniques.dart';
 
 
 
@@ -104,12 +106,18 @@ class SudokuAnalyzer {
 
   /// Analyzes the selected empty cell (row, col) on [currentBoard] and returns
   /// a logical explanation of why [correctVal] is the correct number.
+  ///
+  /// Pass [ctx] when analysing many cells of the same board. The advanced
+  /// technique registry builds nine per-digit implication graphs per call, and
+  /// the caller in [_requiresStrategy] walks every empty cell — reusing one
+  /// context across the sweep turns hundreds of graph builds into nine.
   static String analyzeCell(
     List<List<int>> currentBoard,
     int row,
     int col,
-    int correctVal,
-  ) {
+    int correctVal, {
+    TechniqueContext? ctx,
+  }) {
     // 1. Check for Sole Candidate (Naked Single)
     List<int> validCandidates = [];
     for (int val = 1; val <= 9; val++) {
@@ -167,17 +175,19 @@ class SudokuAnalyzer {
       return "Hidden Single in Block\n\nIn this 3x3 block, this cell is the only place where the number $correctVal can fit. All other empty cells in this block are blocked by conflicts with their respective rows or columns.";
     }
 
-    // Precalculate all candidates for empty cells
-    final candidates = List.generate(9, (r) {
-      return List.generate(9, (c) {
-        if (currentBoard[r][c] != 0) return <int>{};
-        final set = <int>{};
-        for (int v = 1; v <= 9; v++) {
-          if (isValidForAnalysis(currentBoard, r, c, v)) set.add(v);
-        }
-        return set;
-      });
-    });
+    // Precalculate all candidates for empty cells, reusing the caller's matrix
+    // when one was supplied so a whole-board sweep computes them only once.
+    final candidates = ctx?.cand ??
+        List.generate(GameConstants.boardSize, (r) {
+          return List.generate(GameConstants.boardSize, (c) {
+            if (currentBoard[r][c] != 0) return <int>{};
+            final set = <int>{};
+            for (int v = 1; v <= GameConstants.boardSize; v++) {
+              if (isValidForAnalysis(currentBoard, r, c, v)) set.add(v);
+            }
+            return set;
+          });
+        });
 
     // Check for Locked Candidates (Pointing/Claiming), Naked Pairs, Hidden Pairs, X-Wings
     String? hint =
@@ -190,9 +200,58 @@ class SudokuAnalyzer {
       return hint;
     }
 
+    // Then the advanced technique registry: naked/hidden triples, fish
+    // (swordfish, jellyfish, finned, sashimi), the wing family, empty
+    // rectangles, simple coloring and chains.
+    final hits = findJustifyingHits(
+      ctx ?? TechniqueContext.withCandidates(currentBoard, candidates),
+      row,
+      col,
+    );
+    if (hits.isNotEmpty) {
+      return hits.first.render();
+    }
+
     // 5. Fallback for Advanced Heuristics
     return "Advanced Elimination\n\nThrough advanced logical exclusion of other combinations, placing $correctVal in this cell is the only placement that keeps the overall Sudoku board solvable.";
   }
+
+  /// Classifies which technique justifies [correctVal] at the empty cell
+  /// ([row], [col]) — i.e. the technique named by [analyzeCell].
+  ///
+  /// Derives the answer from the explanation's title line, which is a fixed
+  /// string literal at the head of every branch of [analyzeCell]. Matching on
+  /// the title rather than searching the whole explanation avoids the false
+  /// positives you get when one technique's prose mentions another's name.
+  static SolvingStrategy? classifyStrategy(
+    List<List<int>> currentBoard,
+    int row,
+    int col,
+    int correctVal, {
+    TechniqueContext? ctx,
+  }) {
+    final title = _titleOf(
+      analyzeCell(currentBoard, row, col, correctVal, ctx: ctx),
+    ).toLowerCase();
+    for (final strategy in SolvingStrategy.values) {
+      if (title == strategy.label.toLowerCase()) return strategy;
+    }
+    // `analyzeCell` uses a few more specific titles for the same technique.
+    if (title == 'sole candidate (naked single)') {
+      return SolvingStrategy.nakedSingle;
+    }
+    if (title.startsWith('hidden single')) {
+      return SolvingStrategy.hiddenSingle;
+    }
+    if (title.startsWith('locked candidate')) {
+      return SolvingStrategy.lockedCandidates;
+    }
+    return null;
+  }
+
+  /// The first line of an explanation, trimmed — its title.
+  static String _titleOf(String explanation) =>
+      explanation.split('\n').first.trim();
 
   static String? _checkLockedCandidates(
     List<List<int>> board,
@@ -839,7 +898,6 @@ class SudokuAnalyzer {
       title: "Logical Solution Violation",
       explanation:
           "Placing $incorrectVal in Row ${row + 1}, Column ${col + 1} creates a downstream contradiction. The unique logical solution for this cell is $correctVal.",
-      conflictCell: Point(row, col),
     );
   }
 
@@ -927,51 +985,138 @@ class SudokuAnalyzer {
     );
   }
 
-  /// Generates a puzzle tailored to a specific strategy and difficulty level.
-  static SudokuPuzzle generateTargetedPuzzle(
+  /// Resolves a strategy-picker display name (e.g. `"X-Wing"`) to the technique
+  /// this analyzer can actually detect. Returns `null` for names it does not
+  /// implement.
+  static SolvingStrategy? strategyForName(String name) {
+    for (final strategy in SolvingStrategy.values) {
+      if (strategy.label.toLowerCase() == name.toLowerCase()) return strategy;
+    }
+    return null;
+  }
+
+  /// True when [analyzeCell] can produce an explanation for [strategyName].
+  static bool isStrategySupported(String strategyName) =>
+      strategyForName(strategyName) != null;
+
+  /// Every strategy display name the picker may offer that this analyzer can
+  /// genuinely verify. The picker also lists techniques that are not
+  /// implemented (swordfish, chains, colouring, ...); offering them while
+  /// silently returning an unrelated puzzle was a real bug.
+  static List<String> get supportedStrategyNames => SolvingStrategy.values
+      .map((s) => s.label)
+      .toList(growable: false);
+
+  /// Generates a puzzle that requires [strategyName] to solve, falling back to a
+  /// plain puzzle of [difficulty] when that is not achievable.
+  ///
+  /// Matching is done against the structured technique returned by
+  /// [classifyStrategy], never against the explanation prose — the old
+  /// `explanation.contains(strategyName)` check matched on any substring of the
+  /// human-readable body, so a technique named inside a different technique's
+  /// explanation produced false positives.
+  static TargetedPuzzleResult generateTargetedPuzzle(
     String strategyName,
     Difficulty difficulty, {
     int? seed,
+    int maxAttempts = 10,
   }) {
-    for (int attempt = 0; attempt < 10; attempt++) {
-      final puzzle = SudokuLogic.generatePuzzle(
-        difficulty,
-        seed: seed != null ? seed + attempt : null,
-      );
-      final current = SudokuLogic.copyBoard(puzzle.puzzleBoard);
-      for (int r = 0; r < 9; r++) {
-        for (int c = 0; c < 9; c++) {
-          if (current[r][c] == 0) {
-            final explanation = analyzeCell(
-              current,
-              r,
-              c,
-              puzzle.solvedBoard[r][c],
-            );
-            if (explanation
-                .toLowerCase()
-                .contains(strategyName.toLowerCase())) {
-              return puzzle;
-            }
-          }
+    final target = strategyForName(strategyName);
+
+    if (target != null) {
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        final puzzle = SudokuLogic.generatePuzzle(
+          difficulty,
+          seed: seed != null ? seed + attempt : null,
+        );
+        if (_requiresStrategy(puzzle, target)) {
+          return TargetedPuzzleResult(
+            puzzle: puzzle,
+            strategyName: strategyName,
+            achievedTarget: true,
+          );
         }
       }
+      return TargetedPuzzleResult(
+        puzzle: SudokuLogic.generatePuzzle(difficulty, seed: seed),
+        strategyName: strategyName,
+        achievedTarget: false,
+        note:
+            'Could not build a ${difficulty.name} puzzle that specifically '
+            'requires $strategyName after $maxAttempts attempts. Playing a '
+            'standard ${difficulty.name} puzzle instead.',
+      );
     }
-    // Return standard puzzle if attempt limit reached
-    return SudokuLogic.generatePuzzle(difficulty, seed: seed);
+
+    return TargetedPuzzleResult(
+      puzzle: SudokuLogic.generatePuzzle(difficulty, seed: seed),
+      strategyName: strategyName,
+      achievedTarget: false,
+      note:
+          '$strategyName is not one of the techniques the hint engine can '
+          'verify yet. Playing a standard ${difficulty.name} puzzle instead.',
+    );
   }
+
+  /// True when at least one empty cell in [puzzle] can only be resolved using
+  /// [strategy].
+  static bool _requiresStrategy(SudokuPuzzle puzzle, SolvingStrategy strategy) {
+    final current = SudokuLogic.copyBoard(puzzle.puzzleBoard);
+    // One context for the whole sweep. Building a fresh one per cell made this
+    // scan rebuild all nine implication graphs up to 81 times, which pushed
+    // targeted generation close to the 15-second solver timeout.
+    final ctx = TechniqueContext(current);
+    for (var r = 0; r < GameConstants.boardSize; r++) {
+      for (var c = 0; c < GameConstants.boardSize; c++) {
+        if (current[r][c] != 0) continue;
+        final detected = classifyStrategy(
+          current,
+          r,
+          c,
+          puzzle.solvedBoard[r][c],
+          ctx: ctx,
+        );
+        if (detected == strategy) return true;
+      }
+    }
+    return false;
+  }
+}
+
+/// Outcome of [SudokuAnalyzer.generateTargetedPuzzle].
+///
+/// [achievedTarget] is `false` whenever the returned puzzle could not be made
+/// to require the requested technique, and [note] explains why.
+class TargetedPuzzleResult {
+  final SudokuPuzzle puzzle;
+  final String strategyName;
+  final bool achievedTarget;
+  final String? note;
+
+  const TargetedPuzzleResult({
+    required this.puzzle,
+    required this.strategyName,
+    required this.achievedTarget,
+    this.note,
+  });
 }
 
 /// Diagnostic result for mistake analysis.
 class MistakeDiagnosticResult {
   final String title;
   final String explanation;
-  final Point<int> conflictCell;
+
+  /// The peer cell holding the same digit that makes [explanation] a
+  /// conflict, or `null` when the mistake is not a direct conflict at all
+  /// (a downstream/logical violation, where the offending cell is the one the
+  /// player just typed into). Making this nullable lets the UI flash a cell
+  /// only when there is genuinely another cell to point at.
+  final Point<int>? conflictCell;
 
   MistakeDiagnosticResult({
     required this.title,
     required this.explanation,
-    required this.conflictCell,
+    this.conflictCell,
   });
 }
 

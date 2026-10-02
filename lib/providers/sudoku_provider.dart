@@ -165,7 +165,9 @@ class SudokuGameProvider extends ChangeNotifier {
   Map<String, int> get candidateColors => Map.unmodifiable(_candidateColors);
 
   void setSelectedColorIndex(int index) {
-    _selectedColorIndex = index;
+    // 0 = "no colour"; 1..4 are the four palette swatches. Clamping keeps an
+    // out-of-range index from ever reaching a colour lookup.
+    _selectedColorIndex = index.clamp(0, 4);
     notifyListeners();
   }
 
@@ -201,6 +203,57 @@ class SudokuGameProvider extends ChangeNotifier {
     _cellColors.clear();
     _candidateColors.clear();
     notifyListeners();
+  }
+
+  /// Rebuilds the pen/candidate highlight maps from a saved JSON blob.
+  ///
+  /// Every entry is validated before it is accepted: a corrupt or hand-edited
+  /// blob used to be trusted wholesale, and a key like `"9,9,3"` (out of board,
+  /// or a colour index the palette no longer offers) would render as garbage.
+  void _restoreCellColors(String? raw) {
+    _cellColors.clear();
+    _candidateColors.clear();
+    if (raw == null || raw.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+
+      void ingest(String field, Map<String, int> target, int parts) {
+        final source = decoded[field];
+        if (source is! Map) return;
+        source.forEach((key, value) {
+          if (key is! String || value is! int) return;
+          if (value < 1 || value > 4) return; // palette offers 1..4
+          final coords = key.split(',');
+          if (coords.length != parts) return;
+          final cells = <int>[];
+          for (final part in coords) {
+            final parsed = int.tryParse(part);
+            if (parsed == null) return;
+            cells.add(parsed);
+          }
+          if (cells.any(
+            (n) => n < 0 || n >= GameConstants.boardSize,
+          )) {
+            return;
+          }
+          // Candidate colours are keyed "row,col,digit" and the digit must be
+          // a real playable value.
+          if (parts == 3 && (cells[2] < 1 || cells[2] > GameConstants.boardSize)) {
+            return;
+          }
+          target[key] = value;
+        });
+      }
+
+      ingest('cell', _cellColors, 2);
+      ingest('candidate', _candidateColors, 3);
+    } catch (e, stack) {
+      debugPrint('Error restoring cell colors: $e\n$stack');
+      _cellColors.clear();
+      _candidateColors.clear();
+    }
   }
 
   // Session Replay & Hesitation Heatmap Getters & Setters
@@ -316,17 +369,20 @@ class SudokuGameProvider extends ChangeNotifier {
       effectiveSeed = int.tryParse(cleanDate) ?? dailyDate.hashCode;
     }
 
-    const int maxGenerationRetries = 3;
+    // A seeded board must stay byte-for-byte reproducible: a daily challenge has
+    // to hand every player the identical puzzle. So the seed is used verbatim on
+    // every retry (a retry can only ever succeed or fail identically), whereas an
+    // unseeded game gets a fresh board each attempt.
     SudokuPuzzle? puzzle;
-    for (int attempt = 0; attempt < maxGenerationRetries; attempt++) {
+    for (int attempt = 0; attempt < GameConstants.maxGenerationRetries; attempt++) {
       try {
-        final currentSeed = effectiveSeed != null ? effectiveSeed + attempt : null;
+        final currentSeed = effectiveSeed;
         puzzle = await Isolate.run(
           () => SudokuLogic.generatePuzzle(difficulty, seed: currentSeed, variant: variant),
         ).timeout(const Duration(seconds: 15));
         break;
       } catch (e) {
-        if (attempt == maxGenerationRetries - 1) {
+        if (attempt == GameConstants.maxGenerationRetries - 1) {
           _status = GameStatus.error;
           _errorMessage = 'Failed to generate puzzle. Please try again.';
           notifyListeners();
@@ -405,6 +461,14 @@ class SudokuGameProvider extends ChangeNotifier {
     _candidateColors.clear();
     _moveHistory.clear();
     _lastMistakeDiagnostic = null;
+    // Clear any transient hint/flash visuals left over from the previous game,
+    // otherwise the new board renders with the old puzzle's highlights baked in.
+    _activeHintHighlights = {};
+    _activeHintLinks = [];
+    _flashRow = -1;
+    _flashCol = -1;
+    _flashTimer?.cancel();
+    _flashTimer = null;
     _lastMoveTimeMs = DateTime.now().millisecondsSinceEpoch;
 
     _onBoardStateChanged();
@@ -418,26 +482,34 @@ class SudokuGameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Snapshots the current board, notes and mistake count.
+  BoardState _captureState() => BoardState(
+    board: SudokuLogic.copyBoard(_currentBoard),
+    notes: List.generate(
+      GameConstants.boardSize,
+      (r) => List.generate(
+        GameConstants.boardSize,
+        (c) => Set.from(_notes[r][c]),
+      ),
+    ),
+    mistakes: _mistakes,
+  );
+
+  /// Appends [state] to [history], dropping the oldest entries past the cap so
+  /// memory stays bounded. Applied to both stacks — previously only undo was
+  /// capped, so a long undo/redo ping-pong grew the redo stack without limit.
+  static void _pushCapped(List<BoardState> history, BoardState state) {
+    history.add(state);
+    if (history.length > GameConstants.maxUndoHistory) {
+      history.removeAt(0);
+    }
+  }
+
   /// Saves the current board state to undo history
   void _saveToHistory() {
     _redoHistory.clear(); // Clear redo history when a new action is performed!
-    _undoHistory.add(
-      BoardState(
-        board: SudokuLogic.copyBoard(_currentBoard),
-        notes: List.generate(
-          GameConstants.boardSize,
-          (r) => List.generate(
-            GameConstants.boardSize,
-            (c) => Set.from(_notes[r][c]),
-          ),
-        ),
-        mistakes: _mistakes,
-      ),
-    );
     // Limit history size to prevent excessive memory usage
-    if (_undoHistory.length > GameConstants.maxUndoHistory) {
-      _undoHistory.removeAt(0);
-    }
+    _pushCapped(_undoHistory, _captureState());
   }
 
   void triggerFlash(int r, int c) {
@@ -470,19 +542,7 @@ class SudokuGameProvider extends ChangeNotifier {
   Future<void> undo() async {
     if (_status != GameStatus.playing || _undoHistory.isEmpty) return;
 
-    _redoHistory.add(
-      BoardState(
-        board: SudokuLogic.copyBoard(_currentBoard),
-        notes: List.generate(
-          GameConstants.boardSize,
-          (r) => List.generate(
-            GameConstants.boardSize,
-            (c) => Set.from(_notes[r][c]),
-          ),
-        ),
-        mistakes: _mistakes,
-      ),
-    );
+    _pushCapped(_redoHistory, _captureState());
 
     final prevState = _undoHistory.removeLast();
     final oldBoard = SudokuLogic.copyBoard(_currentBoard);
@@ -516,19 +576,7 @@ class SudokuGameProvider extends ChangeNotifier {
   Future<void> redo() async {
     if (_status != GameStatus.playing || _redoHistory.isEmpty) return;
 
-    _undoHistory.add(
-      BoardState(
-        board: SudokuLogic.copyBoard(_currentBoard),
-        notes: List.generate(
-          GameConstants.boardSize,
-          (r) => List.generate(
-            GameConstants.boardSize,
-            (c) => Set.from(_notes[r][c]),
-          ),
-        ),
-        mistakes: _mistakes,
-      ),
-    );
+    _pushCapped(_undoHistory, _captureState());
 
     final nextState = _redoHistory.removeLast();
     final oldBoard = SudokuLogic.copyBoard(_currentBoard);
@@ -563,6 +611,10 @@ class SudokuGameProvider extends ChangeNotifier {
     if (_status != GameStatus.playing) return;
     if (_selectedRow == -1 || _selectedCol == -1) return;
     if (_isOriginalClue[_selectedRow][_selectedCol]) return;
+    // Reject anything outside 1..boardSize. Without this a stray value (a
+    // pasted digit, a malformed SDK import) was written straight into the
+    // board, producing a cell no legality check or win check can account for.
+    if (number < 1 || number > GameConstants.boardSize) return;
 
     final effectiveNotesMode = asNote ?? _notesMode;
 
@@ -638,6 +690,12 @@ class SudokuGameProvider extends ChangeNotifier {
             _stopTimer();
             await _clearSavedGame();
             await StatsManager.recordGameLoss();
+            // The game is over: bail out before the win check below, otherwise a
+            // board that happened to be complete (e.g. revealed hints filled
+            // the last cells) would overwrite `gameOver` with `won` and record a
+            // phantom win right after the loss.
+            notifyListeners();
+            return;
           }
         } else {
           _lastMistakeDiagnostic = null;
@@ -933,6 +991,22 @@ class SudokuGameProvider extends ChangeNotifier {
       await prefs.setString(PrefsKeys.savedNotes, jsonEncode(notesList));
       await prefs.setInt(PrefsKeys.savedMistakes, _mistakes);
       await prefs.setInt(PrefsKeys.savedElapsedSeconds, _elapsedSeconds);
+      await prefs.setInt(PrefsKeys.savedHintsUsed, _hintsUsed);
+
+      // Persist pen/candidate highlighting so a resumed game looks identical to
+      // the one the player walked away from.
+      if (_cellColors.isEmpty && _candidateColors.isEmpty) {
+        await prefs.remove(PrefsKeys.savedCellColors);
+      } else {
+        await prefs.setString(
+          PrefsKeys.savedCellColors,
+          jsonEncode({
+            'cell': _cellColors,
+            'candidate': _candidateColors,
+          }),
+        );
+      }
+
       await prefs.setBool(PrefsKeys.hasSavedGame, true);
     } catch (e, stack) {
       debugPrint('Error saving game state in SudokuGameProvider: $e\n$stack');
@@ -1085,14 +1159,24 @@ class SudokuGameProvider extends ChangeNotifier {
       }
 
       _mistakes = prefs.getInt(PrefsKeys.savedMistakes) ?? 0;
-      _hintsUsed = 0;
+      // Restore the hint count so a resumed game cannot retroactively qualify
+      // for a no-hint achievement it no longer deserves.
+      _hintsUsed = prefs.getInt(PrefsKeys.savedHintsUsed) ?? 0;
       _elapsedSeconds = prefs.getInt(PrefsKeys.savedElapsedSeconds) ?? 0;
+
+      _restoreCellColors(prefs.getString(PrefsKeys.savedCellColors));
 
       _selectedRow = -1;
       _selectedCol = -1;
       _notesMode = false;
       _undoHistory.clear();
       _redoHistory.clear();
+      // Never resurrect transient UI state from a previous session.
+      _activeHintHighlights = {};
+      _activeHintLinks = [];
+      _flashRow = -1;
+      _flashCol = -1;
+      _lastMistakeDiagnostic = null;
 
       _onBoardStateChanged();
 
@@ -1127,7 +1211,24 @@ class SudokuSolverProvider extends ChangeNotifier {
   String? _stepExplanation;
   Timer? _flashTimer;
 
-  List<List<int>> get solverBoard => _solverBoard;
+  /// Cached unmodifiable mirror of [_solverBoard], rebuilt lazily.
+  List<List<int>>? _solverBoardView;
+
+  /// Read-only view of the grid. Exposing `_solverBoard` directly let callers
+  /// mutate provider state without going through `enterNumber`/`clearCell`,
+  /// skipping validation and leaving `notifyListeners` uncalled.
+  List<List<int>> get solverBoard {
+    _solverBoardView = List.unmodifiable(
+      _solverBoard.map(List<int>.unmodifiable),
+    );
+    return _solverBoardView!;
+  }
+
+  /// Drops the cached read-only mirror. The grid is mutated in place by
+  /// [enterNumber]/[clearCell], so identity comparison is not enough to detect
+  /// a stale cache.
+  void _invalidateSolverView() => _solverBoardView = null;
+
   int get selectedRow => _selectedRow;
   int get selectedCol => _selectedCol;
   SolverStatus get status => _status;
@@ -1151,7 +1252,9 @@ class SudokuSolverProvider extends ChangeNotifier {
 
   void enterNumber(int number) {
     if (_selectedRow == -1 || _selectedCol == -1) return;
+    if (number < 0 || number > GameConstants.boardSize) return;
     _solverBoard[_selectedRow][_selectedCol] = number;
+    _invalidateSolverView();
     _status = SolverStatus.idle;
     _errorMessage = null;
     _stepExplanation = null;
@@ -1161,6 +1264,7 @@ class SudokuSolverProvider extends ChangeNotifier {
   void clearCell() {
     if (_selectedRow == -1 || _selectedCol == -1) return;
     _solverBoard[_selectedRow][_selectedCol] = 0;
+    _invalidateSolverView();
     _status = SolverStatus.idle;
     _errorMessage = null;
     _stepExplanation = null;
@@ -1172,12 +1276,50 @@ class SudokuSolverProvider extends ChangeNotifier {
       GameConstants.boardSize,
       (_) => List.filled(GameConstants.boardSize, 0),
     );
+    _invalidateSolverView();
     _selectedRow = -1;
     _selectedCol = -1;
     _status = SolverStatus.idle;
     _errorMessage = null;
     _stepExplanation = null;
     notifyListeners();
+  }
+
+  /// Replaces the entire grid in a single mutation.
+  ///
+  /// Importing a puzzle cell-by-cell through [selectCell] + [enterNumber] fired
+  /// two `notifyListeners()` calls per cell — over 160 rebuilds for an 81-cell
+  /// SDK string — and left the cursor parked on the bottom-right cell. This
+  /// validates the whole matrix up front and notifies exactly once.
+  ///
+  /// Returns `false` (leaving the board untouched) when [board] is not a
+  /// `boardSize x boardSize` matrix or contains a value outside `0..boardSize`.
+  bool loadBoard(List<List<int>> board) {
+    if (board.length != GameConstants.boardSize) return false;
+    for (final row in board) {
+      if (row.length != GameConstants.boardSize) return false;
+      for (final value in row) {
+        if (value < 0 || value > GameConstants.boardSize) return false;
+      }
+    }
+
+    _solverBoard = List.generate(
+      GameConstants.boardSize,
+      (r) => List<int>.from(board[r]),
+    );
+    _invalidateSolverView();
+    // Reset the cursor to a neutral, predictable position instead of leaving it
+    // on the last cell the old import loop happened to visit.
+    _selectedRow = -1;
+    _selectedCol = -1;
+    _flashRow = -1;
+    _flashCol = -1;
+    _flashTimer?.cancel();
+    _status = SolverStatus.idle;
+    _errorMessage = null;
+    _stepExplanation = null;
+    notifyListeners();
+    return true;
   }
 
   void triggerFlash(int r, int c) {
@@ -1219,7 +1361,18 @@ class SudokuSolverProvider extends ChangeNotifier {
       }).timeout(const Duration(seconds: 15));
 
       if (result['success'] == true) {
-        _solverBoard = result['solved'] as List<List<int>>;
+        final solved = result['solved'];
+        if (solved is! List ||
+            solved.length != GameConstants.boardSize) {
+          _status = SolverStatus.error;
+          _errorMessage = "Solving failed: unexpected solver result.";
+          notifyListeners();
+          return;
+        }
+        _solverBoard = solved
+            .map((row) => List<int>.from(row as List))
+            .toList();
+        _invalidateSolverView();
         _status = SolverStatus.solved;
       } else {
         _status = SolverStatus.error;
@@ -1276,6 +1429,7 @@ class SudokuSolverProvider extends ChangeNotifier {
         final solvedCopy = result['solved'] as List<List<int>>;
         final solvedVal = solvedCopy[targetRow][targetCol];
         _solverBoard[targetRow][targetCol] = solvedVal;
+        _invalidateSolverView();
         _status = SolverStatus.idle;
         triggerFlash(targetRow, targetCol);
       } else {
@@ -1337,13 +1491,13 @@ class SudokuSolverProvider extends ChangeNotifier {
 
         int targetRow = -1;
         int targetCol = -1;
-        int minOptions = 10;
+        int minOptions = GameConstants.boardSize + 1;
 
         for (int r = 0; r < GameConstants.boardSize; r++) {
           for (int c = 0; c < GameConstants.boardSize; c++) {
             if (boardCopy[r][c] == 0) {
               int options = 0;
-              for (int val = 1; val <= 9; val++) {
+              for (int val = 1; val <= GameConstants.boardSize; val++) {
                 if (SudokuLogic.isValid(boardCopy, r, c, val)) {
                   options++;
                 }
@@ -1352,9 +1506,14 @@ class SudokuSolverProvider extends ChangeNotifier {
                 minOptions = options;
                 targetRow = r;
                 targetCol = c;
+                // A cell with no legal value would mean the board is unsolvable,
+                // but we already know it solved, so a single option is the
+                // tightest constraint available - stop rescanning.
+                if (options <= 1) break;
               }
             }
           }
+          if (minOptions <= 1) break;
         }
 
         String? explanation;
@@ -1387,6 +1546,7 @@ class SudokuSolverProvider extends ChangeNotifier {
         if (targetRow != -1 && targetCol != -1) {
           _stepExplanation = explanation;
           _solverBoard[targetRow][targetCol] = solvedVal;
+          _invalidateSolverView();
           _selectedRow = targetRow;
           _selectedCol = targetCol;
           _status = SolverStatus.idle;

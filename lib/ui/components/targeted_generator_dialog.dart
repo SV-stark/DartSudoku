@@ -41,9 +41,9 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
       'Hidden Single',
       'Naked Pair',
       'Hidden Pair',
+      'Locked Candidates',
       'Naked Triple',
       'Hidden Triple',
-      'Locked Candidates',
     ],
     2: [
       'X-Wing',
@@ -53,12 +53,10 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
       'Sashimi X-Wing',
     ],
     3: [
-      'Skyscraper',
-      'Two-String-Kite',
-      'Empty Rectangle',
       'Y-Wing',
       'XYZ-Wing',
       'W-Wing',
+      'Empty Rectangle',
     ],
     4: [
       'Simple Coloring',
@@ -69,10 +67,36 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
     ],
   };
 
+  /// Techniques that are soundly implemented but so rare that a randomly
+  /// generated puzzle essentially never requires them. They are still offered,
+  /// because asking for one is legitimate — but the UI says so up front rather
+  /// than letting the generator quietly hand back an unrelated puzzle.
+  static const Set<String> _rareStrategies = {
+    'X-Wing',
+    'Swordfish',
+    'Jellyfish',
+    'XYZ-Wing',
+    'Empty Rectangle',
+    'X-Chain',
+    'XY-Chain',
+    'Alternating Inference Chain',
+  };
+
+  static const Map<int, String> _tierBlurbs = {
+    1: 'The core elimination techniques the hint engine can verify.',
+    2: 'Fish patterns, including the finned and sashimi variants.',
+    3: 'Wing and rectangle strategies.',
+    4: 'Contradiction chains and colouring.',
+  };
+
+  bool _tierIsAvailable(int tier) => (_tierStrategies[tier] ?? const <String>[]).isNotEmpty;
+
   void _onTierChanged(int tier) {
+    final strategies = _tierStrategies[tier];
+    if (strategies == null || strategies.isEmpty) return;
     setState(() {
       _selectedTier = tier;
-      _selectedStrategy = _tierStrategies[tier]!.first;
+      _selectedStrategy = strategies.first;
     });
   }
 
@@ -85,7 +109,7 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
     final diff = _selectedDifficulty;
 
     try {
-      final puzzle = await Isolate.run(
+      final result = await Isolate.run(
         () => SudokuAnalyzer.generateTargetedPuzzle(strategy, diff),
       );
 
@@ -96,11 +120,23 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
         context,
         MaterialPageRoute(
           builder: (_) => GameScreen.fromPuzzle(
-            puzzle: puzzle,
+            puzzle: result.puzzle,
             difficulty: diff,
           ),
         ),
       );
+
+      // Never let the generator quietly hand back a puzzle that has nothing to
+      // do with the technique the player asked for.
+      if (!result.achievedTarget && result.note != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.note!),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -211,9 +247,14 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
                   Column(
                     children: [1, 2, 3, 4].map((tier) {
                       final isSelected = _selectedTier == tier;
+                      final isAvailable = _tierIsAvailable(tier);
+                      final titleText = isAvailable
+                          ? _tierNames[tier]!
+                          : '${_tierNames[tier]!} (coming soon)';
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
+                          enabled: isAvailable,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                             side: BorderSide(
@@ -229,13 +270,23 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
                                 )
                               : null,
                           title: Text(
-                            _tierNames[tier]!,
+                            titleText,
                             style: TextStyle(
                               fontWeight: isSelected
                                   ? FontWeight.bold
                                   : FontWeight.normal,
                             ),
                           ),
+                          subtitle: Text(
+                            _tierBlurbs[tier]!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          trailing: isAvailable
+                              ? null
+                              : const Icon(Icons.hourglass_empty_rounded, size: 18),
                           onTap: () => _onTierChanged(tier),
                         ),
                       );
@@ -249,22 +300,47 @@ class _TargetedGeneratorDialogState extends State<TargetedGeneratorDialog> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: activeStrategies.map((strat) {
-                      final isSelected = _selectedStrategy == strat;
-                      return FilterChip(
-                        label: Text(strat),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          setState(() {
-                            _selectedStrategy = strat;
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
+                  if (activeStrategies.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'No techniques in this tier are implemented yet.',
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: activeStrategies.map((strat) {
+                        final isSelected = _selectedStrategy == strat;
+                        final isRare = _rareStrategies.contains(strat);
+                        return FilterChip(
+                          avatar: isRare
+                              ? Icon(
+                                  Icons.casino_outlined,
+                                  size: 16,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                )
+                              : null,
+                          tooltip: isRare
+                              ? 'This technique is soundly detected but very '
+                                  'rare in generated puzzles, so the generator '
+                                  'may not be able to build one.'
+                              : null,
+                          label: Text(strat),
+                          selected: isSelected,
+                          onSelected: (_) {
+                            setState(() {
+                              _selectedStrategy = strat;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
                 ],
               ),
             ),

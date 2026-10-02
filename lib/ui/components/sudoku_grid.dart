@@ -49,27 +49,36 @@ class SudokuGrid extends StatelessWidget {
     this.hesitationHeatmap,
   });
 
-  static Color _getPaletteColor(int index, {bool isCandidate = false}) {
-    switch (index) {
-      case 1:
-        return isCandidate
-            ? Colors.blue.shade700
-            : Colors.blue.withValues(alpha: 0.35);
-      case 2:
-        return isCandidate
-            ? Colors.green.shade700
-            : Colors.green.withValues(alpha: 0.35);
-      case 3:
-        return isCandidate
-            ? Colors.orange.shade800
-            : Colors.orange.withValues(alpha: 0.35);
-      case 4:
-        return isCandidate
-            ? Colors.purple.shade700
-            : Colors.purple.withValues(alpha: 0.35);
-      default:
-        return Colors.transparent;
+  /// Resolves one of the four palette slots (1-4) to a colour.
+  ///
+  /// The hues are fixed so a green mark means the same thing to the player
+  /// across boards, but the *rendering* is derived from the active theme: in
+  /// dark mode the candidate glyphs used the light-mode `shade700` tones,
+  /// which sat at very low contrast on the dark cell background. Candidates
+  /// now use `ColorScheme.onSurface` at full strength with the hue layered in
+  /// as a 3-way blend, which stays legible in either theme.
+  static Color _getPaletteColor(
+    int index,
+    BuildContext context, {
+    bool isCandidate = false,
+  }) {
+    final hue = switch (index) {
+      1 => Colors.blue,
+      2 => Colors.green,
+      3 => Colors.orange,
+      4 => Colors.purple,
+      _ => Colors.transparent,
+    };
+    if (hue == Colors.transparent) return Colors.transparent;
+
+    if (isCandidate) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final base = Theme.of(context).colorScheme.onSurface;
+      // Dark themes need a lighter mix to clear the dark cell background.
+      final blend = isDark ? 0.72 : 0.85;
+      return Color.lerp(base, hue, blend)!;
     }
+    return hue.withValues(alpha: 0.35);
   }
 
   @override
@@ -183,7 +192,7 @@ class SudokuGrid extends StatelessWidget {
     } else if (candidateFilter != -1 && value == candidateFilter) {
       cellBg = gridTheme.colorScheme.primaryContainer.withValues(alpha: 0.65);
     } else if (cellColorIdx != null && cellColorIdx != 0) {
-      cellBg = _getPaletteColor(cellColorIdx);
+      cellBg = _getPaletteColor(cellColorIdx, context);
     } else if (customCellBgs != null && customCellBgs!.containsKey('$r,$c')) {
       cellBg = customCellBgs!['$r,$c']!;
     } else if (isFlash) {
@@ -347,12 +356,14 @@ class SudokuGrid extends StatelessWidget {
                     ? candidateColors!['$r,$c,$noteNum']
                     : null;
                 if (candColorIdx != null && candColorIdx != 0) {
-                  noteColor = _getPaletteColor(candColorIdx, isCandidate: true);
+                  noteColor = _getPaletteColor(candColorIdx, context, isCandidate: true);
                   fontSize = 10;
                   weight = FontWeight.w900;
                 } else if (candidateFilter != -1) {
                   if (noteNum == candidateFilter) {
-                    noteColor = Colors.orange.shade800;
+                    // Same treatment as the colour palette so the highlighted
+                    // candidate keeps its contrast in dark mode.
+                    noteColor = _getPaletteColor(3, context, isCandidate: true);
                     fontSize = 11;
                     weight = FontWeight.w900;
                   } else {

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../data/prefs_keys.dart';
 import '../../providers/sudoku_provider.dart';
 import '../../core/difficulty.dart';
 import '../../core/sudoku_logic.dart';
@@ -56,6 +54,74 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _isShowingMistakeDialog = false;
   Map<String, double>? _cachedHeatmap;
   int _cachedHeatmapMoveCount = -1;
+  int? _cachedHeatmapStamp;
+
+  /// Set once the player dismisses the hint dialog with "KEEP THINKING".
+  /// While false the highlight is a live overlay; once true it is pinned in
+  /// place until the player actually acts on the board.
+  bool _hintVisualsPinned = false;
+
+  /// The cell the active hint explanation was generated for, as a `"r,c"` key.
+  String? _hintAnchorKey;
+
+  /// The difficulty/variant a "start over" action should use.
+  ///
+  /// `widget.difficulty` / `widget.variant` are only *hints* from the caller —
+  /// `HomeScreen` passes `Difficulty.easy` / `standard` placeholders when it
+  /// resumes a saved game, and the provider is what actually knows the board's
+  /// real difficulty and variant after `loadSavedGame()`. Reading the widget
+  /// meant a resumed Killer/hard game hit "TRY AGAIN" and silently restarted as
+  /// an easy standard puzzle.
+  Difficulty get _effectiveDifficulty => _provider.difficulty;
+  SudokuVariant get _effectiveVariant => _provider.activeVariant;
+
+  /// Restarts the current game, honouring the live difficulty and variant.
+  void _restartGame() {
+    _retireHintVisuals();
+    if (widget.initialPuzzle != null) {
+      _provider.loadPuzzle(
+        widget.initialPuzzle!,
+        _effectiveDifficulty,
+        variant: _effectiveVariant,
+      );
+    } else {
+      _provider.newGame(
+        _effectiveDifficulty,
+        dailyDate: widget.dailyChallengeDate,
+        variant: _effectiveVariant,
+      );
+    }
+  }
+
+  /// Drops a pinned hint overlay once the selection leaves the hinted cell, so
+  /// a stale explanation cannot follow the player around the board.
+  void _clearStaleHintVisuals() {
+    if (!_hintVisualsPinned) return;
+    if (_provider.activeHintHighlights.isEmpty) {
+      _hintVisualsPinned = false;
+      _hintAnchorKey = null;
+      return;
+    }
+    final anchor = _hintAnchorKey;
+    if (anchor == null) {
+      _retireHintVisuals();
+      return;
+    }
+    final r = _provider.selectedRow;
+    final c = _provider.selectedCol;
+    if (r == -1 || c == -1 || '$r,$c' != anchor) {
+      _retireHintVisuals();
+    }
+  }
+
+  /// Any real board mutation or new hint retires the previous overlay.
+  void _retireHintVisuals() {
+    _hintVisualsPinned = false;
+    _hintAnchorKey = null;
+    if (_provider.activeHintHighlights.isNotEmpty) {
+      _provider.clearHintVisuals();
+    }
+  }
 
   @override
   void initState() {
@@ -105,9 +171,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Only `paused`/`detached` are terminal. `inactive` fires transiently (e.g.
+    // pulling down the notification shade, a system dialog, an incoming call
+    // banner) so pausing on it stopped the clock while the player was still
+    // looking at the board, and the game never auto-resumed afterwards.
     if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+        state == AppLifecycleState.detached) {
       _provider.pauseGame();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_provider.status == GameStatus.paused) {
+        _provider.resumeGame();
+        _focusNode.requestFocus();
+      }
     }
   }
 
@@ -133,11 +208,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           if (_provider.elapsedSeconds < 180) {
             AchievementsManager.unlock('speed_demon');
           }
-          if (widget.difficulty == Difficulty.hard && _provider.hintsUsed == 0) {
+          if (_effectiveDifficulty == Difficulty.hard &&
+              _provider.hintsUsed == 0) {
             AchievementsManager.unlock('master_tactician');
           }
           if (widget.dailyChallengeDate != null) {
-            _recordDailyChallengeSuccess();
+            // Single source of truth: DailyChallengeManager owns the completed
+            // date list *and* the derived streak counters *and* the streak
+            // achievement. Writing the raw list here as well left two
+            // divergent copies of the same fact in SharedPreferences.
             try {
               final parts = widget.dailyChallengeDate!.split('-');
               if (parts.length == 3) {
@@ -169,6 +248,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _showMistakeDiagnosticDialog(MistakeDiagnosticResult diag) {
+    // `conflictCell` was computed by the analyzer and then dropped on the
+    // floor — the explanation said "same value already in row 4" without
+    // ever showing *which* cell. Flash it so the player can see the evidence.
+    final conflict = diag.conflictCell;
+    if (conflict != null) {
+      _provider.triggerFlash(conflict.x, conflict.y);
+    }
     showDialog(
       context: context,
       builder: (context) {
@@ -193,9 +279,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ),
             ],
           ),
-          content: Text(
-            diag.explanation,
-            style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                diag.explanation,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+              ),
+              if (conflict != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'The conflicting cell is highlighted on the board (row ${conflict.x + 1}, column ${conflict.y + 1}).',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
           ),
           actions: [
             TextButton(
@@ -214,40 +315,46 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Map<String, double> _calculateHesitationHeatmap() {
     if (_provider.moveHistory.isEmpty) return const {};
+    // Cache on (count, last-move-timestamp) rather than count alone. Undo
+    // shortens the history and a fresh move restores the count, so a
+    // count-only key could serve a heatmap that no longer matches the board.
+    final lastMoveStamp = _provider.moveHistory.last.timestampMs;
     if (_cachedHeatmap != null &&
-        _cachedHeatmapMoveCount == _provider.moveHistory.length) {
+        _cachedHeatmapMoveCount == _provider.moveHistory.length &&
+        _cachedHeatmapStamp == lastMoveStamp) {
       return _cachedHeatmap!;
     }
+    final durations = _provider.moveHistory
+        .map((m) => m.durationMs)
+        .where((d) => d > 0)
+        .toList(growable: false)
+      ..sort();
+    if (durations.isEmpty) return const {};
+
+    // Normalise against the 90th percentile rather than the maximum: a single
+    // long think (or an interruption while the app was backgrounded) used to
+    // squash every other cell's score to nearly zero.
+    final p90Index = (durations.length * 0.9).ceil() - 1;
+    final normaliser = durations[p90Index.clamp(0, durations.length - 1)];
+
     final map = <String, double>{};
-    int maxDur = 1;
     for (var m in _provider.moveHistory) {
-      if (m.durationMs > maxDur) maxDur = m.durationMs;
-    }
-    for (var m in _provider.moveHistory) {
-      double score = (m.durationMs / maxDur).clamp(0.0, 1.0);
-      map['${m.row},${m.col}'] = score;
+      if (m.durationMs <= 0) continue;
+      final score = (m.durationMs / normaliser).clamp(0.0, 1.0);
+      final key = '${m.row},${m.col}';
+      // Keep the peak hesitation per cell instead of the most recent visit, so
+      // revisiting a cell after a quick correction doesn't erase its history.
+      final existing = map[key];
+      if (existing == null || score > existing) {
+        map[key] = score;
+      }
     }
     _cachedHeatmap = map;
     _cachedHeatmapMoveCount = _provider.moveHistory.length;
+    _cachedHeatmapStamp = lastMoveStamp;
     return map;
   }
 
-
-  Future<void> _recordDailyChallengeSuccess() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final list =
-          prefs.getStringList(PrefsKeys.completedDailyChallenges) ?? [];
-      if (!list.contains(widget.dailyChallengeDate)) {
-        list.add(widget.dailyChallengeDate!);
-        await prefs.setStringList(PrefsKeys.completedDailyChallenges, list);
-      }
-    } catch (e, stack) {
-      debugPrint(
-        'Error recording daily challenge success in GameScreen: $e\n$stack',
-      );
-    }
-  }
 
   @override
   void dispose() {
@@ -260,6 +367,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return;
+
+    // Never hijack key events that belong to a system/desktop shortcut
+    // (Ctrl+N, Alt+1, Cmd+S, ...). Without this guard, holding a modifier and
+    // tapping a digit silently mutated the board.
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isMetaPressed) {
+      return;
+    }
 
     final key = event.logicalKey;
 
@@ -302,6 +419,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (number != null) {
       final isShiftActive = HardwareKeyboard.instance.isShiftPressed;
       final isNotesMode = _provider.notesMode;
+      _retireHintVisuals();
 
       if (isShiftActive) {
         _provider.enterNumber(number, asNote: !isNotesMode);
@@ -314,6 +432,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // Erase keys
     if (key == LogicalKeyboardKey.backspace ||
         key == LogicalKeyboardKey.delete) {
+      _retireHintVisuals();
       _provider.eraseCell();
       return;
     }
@@ -323,6 +442,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         key == LogicalKeyboardKey.arrowDown ||
         key == LogicalKeyboardKey.arrowLeft ||
         key == LogicalKeyboardKey.arrowRight) {
+      _clearStaleHintVisuals();
       int r = _provider.selectedRow;
       int c = _provider.selectedCol;
 
@@ -389,6 +509,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       context,
     );
     _provider.setHintVisuals(hintResult.customHighlights, hintResult.links);
+    _hintAnchorKey = '$r,$c';
+    _hintVisualsPinned = false;
 
     showDialog(
       context: context,
@@ -435,7 +557,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                Navigator.pop(context);
+                // "Keep thinking" must not leave the explanation's highlights
+                // burned into the board for the rest of the session. They stay
+                // up while the player studies the same cell and are cleared as
+                // soon as they move on (see _clearStaleHintVisuals and
+                // _handleKeyEvent).
+                _hintVisualsPinned = true;
+                setState(() {});
+              },
               child: Text(
                 'KEEP THINKING',
                 style: TextStyle(
@@ -514,7 +645,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                   ? _calculateHesitationHeatmap()
                                   : null,
                               onCellTap: (r, c) {
+                                // Clear before *and* after: the first call
+                                // retires an overlay pinned on some other cell,
+                                // the second retires one pinned on the cell the
+                                // player is navigating away from.
+                                _clearStaleHintVisuals();
                                 _provider.selectCell(r, c);
+                                _clearStaleHintVisuals();
                               },
                             );
                           },
@@ -607,6 +744,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               showMistakes: _provider.showMistakes,
                               flashRow: _provider.flashRow,
                               flashCol: _provider.flashCol,
+                              // Hint highlights must reach the portrait layout too; otherwise
+                              // every hint reads as unexplained in the orientation the app
+                              // usually opens in.
+                              customCellBgs: _provider.activeHintHighlights,
                               cellColors: _provider.cellColors,
                               candidateColors: _provider.candidateColors,
                               variant: _provider.activeVariant,
@@ -615,7 +756,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                   ? _calculateHesitationHeatmap()
                                   : null,
                               onCellTap: (r, c) {
+                                // Clear before *and* after: the first call
+                                // retires an overlay pinned on some other cell,
+                                // the second retires one pinned on the cell the
+                                // player is navigating away from.
+                                _clearStaleHintVisuals();
                                 _provider.selectCell(r, c);
+                                _clearStaleHintVisuals();
                               },
                             );
                           },
@@ -699,9 +846,38 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Widget _buildHeader(Color difficultyColor) {
     final theme = Theme.of(context);
+    // A three-way spaceBetween overflows on narrow windows / small phones,
+    // especially with the long "DAILY CHALLENGE" label. Drop the icon-button
+    // labels' chrome down to a compact form and let the badge flex instead.
+    final compact = MediaQuery.of(context).size.width < 380;
+
+    final difficultyBadge = Container(
+      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: difficultyColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: difficultyColor.withValues(alpha: 0.5),
+          width: 1.0,
+        ),
+      ),
+      child: Text(
+        widget.dailyChallengeDate != null
+            ? (compact ? 'DAILY' : 'DAILY CHALLENGE')
+            : _provider.difficulty.name.toUpperCase(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: difficultyColor,
+          fontSize: compact ? 11 : 14,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         // Back Button & Actions group
         Row(
@@ -710,6 +886,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             IconButton.filledTonal(
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.arrow_back_rounded),
+              tooltip: 'Back',
             ),
             const SizedBox(width: 8),
             ValueListenableBuilder<ThemeMode>(
@@ -736,29 +913,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ],
         ),
 
+        const Spacer(),
+
         // Difficulty Badge (FilterChip-like styling)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: difficultyColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: difficultyColor.withValues(alpha: 0.5),
-              width: 1.0,
-            ),
-          ),
-          child: Text(
-            widget.dailyChallengeDate != null
-                ? 'DAILY CHALLENGE'
-                : _provider.difficulty.name.toUpperCase(),
-            style: TextStyle(
-              color: difficultyColor,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ),
+        Flexible(child: difficultyBadge),
+
+        const Spacer(),
 
         // Timer Panel (Material 3 Chip look)
         AnimatedBuilder(
@@ -799,39 +959,52 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return const SizedBox(height: 20);
     }
 
+    // Render enough hearts to show the real mistake count. Previously the row
+    // always drew exactly `maxMistakes` hearts, so in endless mode the 4th,
+    // 5th, ... mistakes were invisible even though the counter had climbed.
+    final heartCount = _provider.mistakes > _provider.maxMistakes
+        ? _provider.mistakes
+        : _provider.maxMistakes;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         // Mistakes Counter
-        Row(
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: theme.colorScheme.error,
-              size: 18,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Mistakes: ',
-              style: TextStyle(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                fontSize: 14,
+        Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: theme.colorScheme.error,
+                size: 18,
               ),
-            ),
-            ...List.generate(_provider.maxMistakes, (index) {
-              final bool isMistake = index < _provider.mistakes;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                child: Icon(
-                  Icons.favorite_rounded,
-                  size: 16,
-                  color: isMistake
-                      ? theme.colorScheme.error.withValues(alpha: 0.15)
-                      : theme.colorScheme.error,
+              const SizedBox(width: 6),
+              Text(
+                'Mistakes: ',
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontSize: 14,
                 ),
-              );
-            }),
-          ],
+              ),
+              Flexible(
+                child: Wrap(
+                  spacing: 4.0,
+                  clipBehavior: Clip.hardEdge,
+                  children: List.generate(heartCount, (index) {
+                    final bool isMistake = index < _provider.mistakes;
+                    return Icon(
+                      Icons.favorite_rounded,
+                      size: 16,
+                      color: isMistake
+                          ? theme.colorScheme.error.withValues(alpha: 0.15)
+                          : theme.colorScheme.error,
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
         ),
 
         // Progress or clues count
@@ -909,21 +1082,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: () {
-                if (widget.initialPuzzle != null) {
-                  _provider.loadPuzzle(
-                    widget.initialPuzzle!,
-                    widget.difficulty,
-                    variant: widget.variant,
-                  );
-                } else {
-                  _provider.newGame(
-                    widget.difficulty,
-                    dailyDate: widget.dailyChallengeDate,
-                    variant: widget.variant,
-                  );
-                }
-              },
+              onPressed: _restartGame,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('RETRY'),
             ),
@@ -1040,11 +1199,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           const SizedBox(width: 12),
                           Expanded(
                             child: FilledButton(
-                              onPressed: () => _provider.newGame(
-                                widget.difficulty,
-                                variant: widget.variant,
-                                dailyDate: widget.dailyChallengeDate,
-                              ),
+                              onPressed: _restartGame,
                               style: FilledButton.styleFrom(
                                 backgroundColor: theme.colorScheme.error,
                                 foregroundColor: theme.colorScheme.onError,
@@ -1135,11 +1290,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           const SizedBox(width: 12),
                           Expanded(
                             child: FilledButton(
-                              onPressed: () => _provider.newGame(
-                                widget.difficulty,
-                                variant: widget.variant,
-                                dailyDate: widget.dailyChallengeDate,
-                              ),
+                              onPressed: _restartGame,
                               child: const Text('PLAY AGAIN'),
                             ),
                           ),
